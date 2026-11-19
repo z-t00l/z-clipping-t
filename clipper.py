@@ -533,10 +533,42 @@ def make_thumbnail(clip_file: Path, title: str, out_path: Path, style: int = 0, 
     if best is None:
         run(["ffmpeg","-y","-ss","1","-i",str(clip_file),"-frames:v","1",str(out_path)])
         return
-    img = Image.fromarray(cv2.cvtColor(best, cv2.COLOR_BGR2RGB)).resize((720, 1280))
-    img = ImageEnhance.Color(img).enhance(1.55)
-    img = ImageEnhance.Contrast(img).enhance(1.18)
-    img = ImageEnhance.Sharpness(img).enhance(1.5)
+    # --- Professional composition ---
+    # Background: blurred + dark saturated frame
+    bg = Image.fromarray(cv2.cvtColor(best, cv2.COLOR_BGR2RGB)).resize((720, 1280))
+    bg = bg.filter(ImageFilter.GaussianBlur(18))
+    bg = ImageEnhance.Color(bg).enhance(1.5)
+    bg = ImageEnhance.Brightness(bg).enhance(0.72)
+    # dark gradient bottom
+    grad = Image.new("L", (1, 1280))
+    for yy in range(1280):
+        grad.putpixel((0, yy), int(255 * (yy / 1280) ** 1.6))
+    black = Image.new("RGB", (720, 1280), (0, 0, 0))
+    img = Image.composite(black, bg, grad.resize((720, 1280)))
+    # Foreground: face crop bara karke white outline ke saath
+    sharp_img = Image.fromarray(cv2.cvtColor(best, cv2.COLOR_BGR2RGB)).resize((720, 1280))
+    sharp_img = ImageEnhance.Color(sharp_img).enhance(1.35)
+    sharp_img = ImageEnhance.Contrast(sharp_img).enhance(1.15)
+    sharp_img = ImageEnhance.Sharpness(sharp_img).enhance(1.5)
+    if best_face:
+        fx, fy, fw, fh = best_face
+        pad_x, pad_y = int(fw * 1.1), int(fh * 1.4)
+        x0 = max(0, fx - pad_x); y0 = max(0, fy - pad_y)
+        x1 = min(720, fx + fw + pad_x); y1 = min(1280, fy + fh + int(fh * 2.2))
+        crop = sharp_img.crop((x0, y0, x1, y1))
+        cw, ch = crop.size
+        scale = 620 / max(1, cw)
+        crop = crop.resize((int(cw * scale), int(ch * scale)))
+        # white outline + shadow
+        outline = Image.new("RGB", (crop.size[0] + 16, crop.size[1] + 16), (255, 255, 255))
+        shadow = Image.new("RGBA", (outline.size[0], outline.size[1]), (0, 0, 0, 160))
+        px = (720 - outline.size[0]) // 2
+        py = 300
+        img.paste(shadow, (px + 10, py + 12), shadow)
+        img.paste(outline, (px, py))
+        img.paste(crop, (px + 8, py + 8))
+    else:
+        img = sharp_img
     # short hook words: title ke pehle 4 words, uppercase
     clean = re.sub(r"[^\w\s?!]", "", title).strip().upper()
     words = clean.split()[:4]
@@ -571,10 +603,14 @@ def make_thumbnail(clip_file: Path, title: str, out_path: Path, style: int = 0, 
     # accent line
     draw.rectangle([0, y0 - 26, 720, y0 - 14], fill=accent + (255,))
     y = y0
-    for ln in lines:
+    for li, ln in enumerate(lines):
         bbox = draw.textbbox((0, 0), ln, font=font)
         x = (720 - (bbox[2] - bbox[0])) / 2
-        draw.text((x, y), ln, font=font, fill=text_color, stroke_width=10, stroke_fill=(0, 0, 0))
+        # shadow layer
+        draw.text((x + 6, y + 6), ln, font=font, fill=(0, 0, 0), stroke_width=10, stroke_fill=(0, 0, 0))
+        # two-tone: pehli line accent color, dusri main color
+        col = accent if li == 0 and len(lines) > 1 else text_color
+        draw.text((x, y), ln, font=font, fill=col, stroke_width=10, stroke_fill=(0, 0, 0))
         y += line_h
     # viral badge top-right
     if viral_score:

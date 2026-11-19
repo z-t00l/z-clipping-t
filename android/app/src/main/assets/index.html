@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="ur">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zubi AI Clipping Tool — Free</title>
+<style>
+  *{box-sizing:border-box} body{font-family:system-ui,Arial,sans-serif;margin:0;background:#0f1115;color:#f5f5f5}
+  .wrap{max-width:860px;margin:0 auto;padding:20px}
+  h1{font-size:28px;margin:8px 0} .sub{color:#b8bec9}
+  .card{background:#171a21;border:1px solid #262b36;border-radius:14px;padding:16px;margin:14px 0}
+  label{display:block;margin:12px 0 6px;font-weight:600}
+  input,select{width:100%;padding:12px;border-radius:10px;border:1px solid #333a48;background:#0f1115;color:#fff;font-size:16px}
+  .chips{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
+  .chip{padding:8px 14px;border-radius:999px;border:1px solid #3a4254;background:#1e232e;color:#fff;cursor:pointer}
+  .chip.active{background:#ff3d5a;border-color:#ff3d5a}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:12px} @media(max-width:640px){.row{grid-template-columns:1fr}}
+  button.cta{width:100%;padding:14px;border:0;border-radius:12px;background:#ff3d5a;color:#fff;font-size:18px;font-weight:700;cursor:pointer;margin-top:16px}
+  .feat{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
+  .feat div{background:#1e232e;border-radius:10px;padding:12px}
+  code{background:#0f1115;padding:2px 6px;border-radius:6px;word-break:break-all}
+  .ok{color:#7ee787} .muted{color:#9aa3b2;font-size:14px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🎬 Zubi AI Clipping Tool</h1>
+  <p class="sub">Long YouTube / stream video → best viral Shorts, Reels, TikTok, Facebook Reels. Bilkul free — GitHub par chalta hai, paisay nahi lagtay.</p>
+
+  <div class="card">
+    <div class="feat">
+      <div>🧑 <b>Face Tracking</b><br><span class="muted">Speaker ko follow karke 9:16 crop</span></div>
+      <div>💬 <b>Auto Subtitles</b><br><span class="muted">Har language, auto-detect (99 languages)</span></div>
+      <div>😂 <b>Auto Emoji</b><br><span class="muted">Words ke hisab se emoji captions mein</span></div>
+      <div>🔥 <b>Viral Score</b><br><span class="muted">Hook + Pacing + Engagement</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <label for="url">YouTube / Stream Link</label>
+    <input id="url" placeholder="https://www.youtube.com/watch?v=...">
+
+    <label>Kitni Clips Chahiye?</label>
+    <div class="chips" id="chips">
+      <button type="button" class="chip" data-n="1">1</button>
+      <button type="button" class="chip" data-n="2">2</button>
+      <button type="button" class="chip" data-n="3">3</button>
+      <button type="button" class="chip" data-n="4">4</button>
+      <button type="button" class="chip active" data-n="5">5</button>
+      <button type="button" class="chip" data-n="10">10</button>
+      <button type="button" class="chip" data-n="15">15</button>
+      <button type="button" class="chip" data-n="20">20</button>
+    </div>
+    <input id="clips" type="number" min="1" max="100" value="5" aria-label="Clips ki quantity">
+    <p class="muted">Upar se choose karo ya apni marzi ka number likho — jitni chahiye utni.</p>
+
+    <div class="row">
+      <div>
+        <label for="lang">Video Ki Language</label>
+        <select id="lang">
+          <option value="auto" selected>Auto Detect (har language)</option>
+          <option value="ur">Urdu</option><option value="en">English</option>
+          <option value="hi">Hindi</option><option value="ar">Arabic</option>
+          <option value="es">Spanish</option><option value="fr">French</option>
+          <option value="de">German</option><option value="pt">Portuguese</option>
+          <option value="tr">Turkish</option><option value="id">Indonesian</option>
+          <option value="bn">Bengali</option><option value="pa">Punjabi</option>
+        </select>
+      </div>
+      <div>
+        <label for="fit">Vertical Style</label>
+        <select id="fit">
+          <option value="face" selected>Face Tracking (best)</option>
+          <option value="blur">Blur Background</option>
+        </select>
+      </div>
+    </div>
+
+    <label>Download Quality (har clip ki alag file, without watermark)</label>
+    <div class="chips" id="qualities">
+      <label class="chip"><input type="checkbox" class="q" value="720p" checked style="width:auto"> HD 720p</label>
+      <label class="chip"><input type="checkbox" class="q" value="1080p" checked style="width:auto"> Full HD 1080p</label>
+      <label class="chip"><input type="checkbox" class="q" value="2k" style="width:auto"> 2K</label>
+      <label class="chip"><input type="checkbox" class="q" value="4k" style="width:auto"> 4K</label>
+    </div>
+    <p class="muted">Note: Source video 720p hai to 4K file ban jayegi lekin real detail nahi barhegi, sirf upscale hogi aur file bari / slow hogi. Best quality ke liye source bhi HD/4K ho.</p>
+    <label><input type="checkbox" id="own" style="width:auto"> Ye meri apni video hai ya mere paas permission hai</label>
+    <p class="muted" style="color:#ffb86b">⚠️ Copyright: Dusray ki copyrighted video ko clip, caption ya face-track karne se wo copyright-free NAHI banti. Sirf apni, Creative Commons, public domain, ya permission wali video post karo, warna Content ID / strike ka risk hai.</p>
+    <label><input type="checkbox" id="emoji" checked style="width:auto"> Auto Emoji on</label>
+    <label><input type="checkbox" id="translate" style="width:auto"> Subtitles English mein translate karo</label>
+
+    <button class="cta" id="go">Clips Banao — Free</button>
+    <p id="out" class="muted"></p>
+    <p class="muted">Ye page GitHub Pages par free host hoti hai. Asli processing GitHub Actions (free) par hoti hai: repo mein <b>Actions → Make Clips (Free) → Run workflow</b> mein yehi link, clips quantity aur language dalo, clips artifact mein download ho jayengi. APK bhi <b>Actions → Build APK</b> se free banta hai.</p>
+  </div>
+
+  <div class="card">
+    <h3>Command (computer par chalane ke liye)</h3>
+    <p><code id="cmd">python clipper.py --url "..." --clips 5 --language auto --fit face</code></p>
+  </div>
+</div>
+<script>
+  const chips=[...document.querySelectorAll('.chip')], clips=document.getElementById('clips');
+  chips.forEach(c=>c.onclick=()=>{chips.forEach(x=>x.classList.remove('active'));c.classList.add('active');clips.value=c.dataset.n;update();});
+  clips.oninput=()=>{chips.forEach(x=>x.classList.toggle('active',x.dataset.n===clips.value));update();};
+  const url=document.getElementById('url'), lang=document.getElementById('lang'), fit=document.getElementById('fit');
+  [url,lang,fit].forEach(e=>e.oninput=update); document.querySelectorAll('.q').forEach(e=>e.onchange=update);
+  function update(){
+    const qs=[...document.querySelectorAll('.q:checked')].map(x=>x.value).join(',')||'720p'; document.getElementById('cmd').textContent=`python clipper.py --url "${url.value||'...'}" --clips ${clips.value||5} --language ${lang.value} --fit ${fit.value} --qualities ${qs}`;
+  }
+  document.getElementById('go').onclick=()=>{
+    if(!url.value.trim()){document.getElementById('out').textContent='Pehle YouTube link dalo.';return;}
+    const job={url:url.value,clips:+clips.value||5,language:lang.value,fit:fit.value,qualities:[...document.querySelectorAll('.q:checked')].map(x=>x.value),own:document.getElementById('own').checked,emoji:document.getElementById('emoji').checked,translate:document.getElementById('translate').checked,watermark:false,at:new Date().toISOString()};
+    const jobs=JSON.parse(localStorage.getItem('clipJobs')||'[]'); jobs.unshift(job); localStorage.setItem('clipJobs',JSON.stringify(jobs));
+    document.getElementById('out').innerHTML=`<span class="ok">✔ Job save ho gayi:</span> ${job.clips} clips, language=${job.language}, style=${job.fit}, qualities=${job.qualities.join(', ')} (without watermark). Har clip ready honay par us ke alag download buttons milenge: ${job.qualities.map(q=>`<button type="button" disabled title="Clip ready honay ke baad active hoga">⬇ ${q}</button>`).join(' ')}<br>Ab GitHub repo mein Actions → Make Clips (Free) mein yehi details dal kar Run karo, ya ye job Muse mein Jaan ko bhej do, wo clips bana dega.`;
+    update();
+  };
+  update();
+</script>
+</body>
+</html>

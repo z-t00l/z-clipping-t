@@ -370,14 +370,29 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     out_path.write_text("\n".join(lines), encoding="utf-8")
 
 def render_face_tracked(video: Path, start, end, out_silent: Path, fit="face"):
+    """9:16 crop jo face ko smoothly follow kare.
+
+    Smoothness ke liye:
+    - Face har 5 frames par detect hota hai (chhoti frame par, fast).
+    - Wahi face follow hota hai jo pichli position ke qareeb ho (sab se bada
+      face har bar nahi uthate, warna do logon ke darmiyan crop uchhalta hai).
+    - Crop ek target ki taraf ahista pan karta hai (max speed limit), is liye
+      video idhar udhar nahi bhagti.
+    - Scene cut detect ho to crop foran nayi position par snap ho jata hai
+      (cut ke paar pan karna sab se zyada kharab lagta hai).
+    - Chhoti movements (dead zone) ignore hoti hain.
+    """
     import cv2
     cap = cv2.VideoCapture(str(video))
     fps = cap.get(cv2.CAP_PROP_FPS) or 30
     cap.set(cv2.CAP_PROP_POS_MSEC, start*1000)
     cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
+    profile = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_profileface.xml")
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
     writer = cv2.VideoWriter(str(out_silent), fourcc, fps, (720,1280))
-    cx_smooth = None
+    cx = None          # current crop center (source pixels)
+    target = None      # jahan crop ko jana hai
+    prev_small = None  # scene-cut detection ke liye
     frames = 0; face_frames = 0
     total = int((end-start)*fps)
     for n in range(total):
@@ -393,18 +408,50 @@ def render_face_tracked(video: Path, start, end, out_silent: Path, fit="face"):
             y = (1280-fg_h)//2
             bg[y:y+fg_h] = fg
             writer.write(bg); frames+=1; continue
-        # face mode: detect every 10 frames
-        if n % 10 == 0:
-            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            faces = cascade.detectMultiScale(gray, 1.2, 5, minSize=(60,60))
+        # --- scene cut detection (chhoti gray frame ka farq) ---
+        small = cv2.resize(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY), (64, 36))
+        scene_cut = False
+        if prev_small is not None:
+            diff = float(cv2.absdiff(small, prev_small).mean())
+            scene_cut = diff > 28
+        prev_small = small
+        # --- face detection har 5 frames par ---
+        if n % 5 == 0 or scene_cut:
+            scale = 640 / w
+            det = cv2.resize(frame, (640, int(h*scale)))
+            gray = cv2.cvtColor(det, cv2.COLOR_BGR2GRAY)
+            faces = list(cascade.detectMultiScale(gray, 1.15, 5, minSize=(40,40)))
+            if not len(faces):
+                faces = list(profile.detectMultiScale(gray, 1.15, 5, minSize=(40,40)))
             if len(faces):
-                face_frames += 10
-                x,y,fw,fh = max(faces, key=lambda f: f[2]*f[3])
-                cx = x+fw/2
-                cx_smooth = cx if cx_smooth is None else 0.85*cx_smooth+0.15*cx
-        if cx_smooth is None:
-            cx_smooth = w/2
-        x1 = int(max(0, min(w-crop_w, cx_smooth-crop_w/2)))
+                face_frames += 5
+                centers = [((x+fw/2)/scale, fw/scale) for x, y, fw, fh in faces]
+                if target is None or scene_cut:
+                    # sab se bada face
+                    new_target = max(centers, key=lambda c: c[1])[0]
+                else:
+                    # pichle target ke sab se qareeb wala face (wahi banda)
+                    near = min(centers, key=lambda c: abs(c[0]-target))
+                    # do face qareeb hon to darmiyan mein center karo
+                    close = [c for c in centers if abs(c[0]-near[0]) < crop_w*0.8]
+                    new_target = sum(c[0] for c in close)/len(close) if len(close) > 1 else near[0]
+                if scene_cut or target is None:
+                    target = new_target
+                    cx = new_target  # cut par foran snap, pan nahi
+                elif abs(new_target - target) > w*0.02:  # dead zone
+                    target = 0.6*target + 0.4*new_target
+        if cx is None:
+            cx = target = w/2
+        if target is None:
+            target = cx
+        # --- smooth pan: har frame target ki taraf limited speed se ---
+        max_step = max(2.0, w*0.004)  # ~0.4% width per frame
+        delta = target - cx
+        if abs(delta) > max_step:
+            cx += max_step if delta > 0 else -max_step
+        else:
+            cx = target
+        x1 = int(max(0, min(w-crop_w, cx-crop_w/2)))
         cropped = frame[:, x1:x1+crop_w]
         writer.write(cv2.resize(cropped, (720,1280)))
         frames+=1

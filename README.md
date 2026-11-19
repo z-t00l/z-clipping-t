@@ -10,6 +10,7 @@ Bilkul free, open source. Koi paid API nahi.
 - **Viral score**: Hook 40% + Pacing 35% + Engagement 25%, har clip ka breakdown.
 - **Clips quantity input**: 1, 2, 3, 4, 5, 10 ya jitni chahiye — web UI mein chips + number input, CLI mein `--clips N`.
 - **Har language**: `--language auto` (Whisper 99 languages auto-detect) ya specific code `ur/en/hi/ar/es/fr/de/pt/tr/id/bn/pa`. `--translate-to-english` se subtitles English mein bhi ho sakti hain.
+- **Subtitles language khud select karo**: `--subtitle-language auto|none|en|ur|hi|ar|es|fr|de|pt|tr|id|bn|pa|ru|ja|ko|zh`. `auto` = video wali language, `none` = **without subtitles** saaf clips (ya `--no-subtitles`). Dusri language select karne par subtitles YouTube captions se ya auto-translate (Google/MyMemory) se bante hain — translation kabhi kabhi perfect nahi hoti. Web UI aur GitHub Actions mein bhi yehi select option hai.
 - **Extra best features**: Hook title pehle 3 sec, loudness normalize (-14 LUFS), auto thumbnail, title + hashtags, 9:16 export, Blur mode.
 - **Download qualities (without watermark)**: Har clip ki alag files — HD 720p (720x1280), Full HD 1080p (1080x1920), 2K (1440x2560), 4K (2160x3840). `--qualities 720p,1080p,2k,4k`. Koi watermark nahi lagta.
   - Sach: Source 720p hai to 4K file sirf upscale hogi, real detail nahi barhegi, file bari aur slow hogi. Best result ke liye source bhi HD/4K ho.
@@ -28,6 +29,8 @@ Bilkul free, open source. Koi paid API nahi.
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 .venv/bin/python clipper.py --url "https://www.youtube.com/watch?v=XXXX" --clips 10 --language auto --fit face --qualities 720p,1080p,2k,4k
+.venv/bin/python clipper.py --url "https://www.youtube.com/watch?v=XXXX" --clips 5 --subtitle-language ur
+.venv/bin/python clipper.py --url "https://www.youtube.com/watch?v=XXXX" --clips 5 --no-subtitles
 .venv/bin/python clipper.py --file video.mp4 --clips 1 --fit blur --language ur
 ```
 Output: `output/clips.json`, har clip `output/clip_01/clip_01_9x16.mp4` + `thumbnail.jpg`

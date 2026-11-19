@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       url:
-        description: "YouTube / stream video link"
+        description: "Video ka link (YouTube, TikTok, Instagram, Facebook, X, Vimeo, ya direct MP4 link)"
         required: true
         type: string
       clips:
@@ -23,6 +23,12 @@ on:
         default: "auto"
         type: choice
         options: ["auto", "none", "en", "ur", "hi", "ar", "es", "fr", "de", "pt", "tr", "id", "bn", "pa", "ru", "ja", "ko", "zh"]
+      duration:
+        description: "Har clip ki duration (auto = 25-60 sec best moments)"
+        required: true
+        default: "auto"
+        type: choice
+        options: ["auto", "15", "30", "45", "60", "90"]
       fit:
         description: "face (face tracking) ya blur"
         required: true
@@ -63,6 +69,7 @@ jobs:
           EXTRA=""
           if [ "${{ inputs.translate_to_english }}" = "true" ]; then EXTRA="$EXTRA --translate-to-english"; fi
           if [ "${{ inputs.i_own_this }}" = "true" ]; then EXTRA="$EXTRA --i-own-this"; fi
+          if [ "${{ inputs.duration }}" != "auto" ]; then EXTRA="$EXTRA --duration ${{ inputs.duration }}"; fi
           python clipper.py --url "${{ inputs.url }}" --clips "${{ inputs.clips }}" --language "${{ inputs.language }}" --subtitle-language "${{ inputs.subtitle_language }}" --fit "${{ inputs.fit }}" --qualities "${{ inputs.qualities }}" $EXTRA --out output
       - name: Upload clips (free artifact, 90 din tak)
         uses: actions/upload-artifact@v4

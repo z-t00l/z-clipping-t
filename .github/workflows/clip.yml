@@ -69,6 +69,8 @@ jobs:
           YT_COOKIES: ${{ secrets.YT_COOKIES }}
         run: |
           if [ -n "$YT_COOKIES" ]; then printf '%s' "$YT_COOKIES" > cookies.txt; echo "cookies lag gayi"; else echo "cookies nahi hain"; fi
+      - name: Start PO Token server
+        run: docker run --name bgutil-provider -d --init -p 127.0.0.1:4416:4416 brainicism/bgutil-ytdlp-pot-provider
       - name: Make clips
         run: |
           EXTRA=""

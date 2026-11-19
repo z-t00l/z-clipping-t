@@ -121,7 +121,7 @@ def download(url, outdir: Path, max_height=1080, language=None, subtitle_languag
     # ya direct MP4/MOV link (yt-dlp 1000+ sites support karta hai).
     # YouTube bot-check ("Sign in to confirm you're not a bot") par
     # mukhtalif player clients bari bari try karo.
-    clients = ["web", "mweb", "android", "tv_embedded", "web_embedded", "ios", "web_safari", None]
+    clients = ["android_vr", "web", "mweb", "android", "tv_embedded", "web_embedded", "ios", "web_safari", None]
     last_err = None
     for client in clients:
         try:

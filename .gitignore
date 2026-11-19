@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+output/
+*.mp4
+*.m4a
+*.wav
+*.jpg
+*.ass
+*.vtt
+.DS_Store
+android/.gradle/
+android/app/build/
+android/build/
+*.apk
+*.aab

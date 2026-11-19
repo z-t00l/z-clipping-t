@@ -116,6 +116,14 @@
       <label class="chip"><input type="checkbox" class="q" value="4k" style="width:auto"> 4K</label>
     </div>
     <p class="muted">Note: Source video 720p hai to 4K file ban jayegi lekin real detail nahi barhegi, sirf upscale hogi aur file bari / slow hogi. Best quality ke liye source bhi HD/4K ho.</p>
+    <label for="dltype">Download Ka Type (clips ready honay par)</label>
+    <select id="dltype">
+      <option value="single" selected>Single Clip Download (har clip alag, har quality)</option>
+      <option value="all">All Clips — 1 Click Mein Sab</option>
+      <option value="zip">All Clips — ZIP File Mein</option>
+    </select>
+    <p class="muted">Har clip ke saath <b>best attractive thumbnail</b> (sharp frame + title text) aur <b>best title + hashtags + caption</b> bhi milta hai. Zyada clips hon to ZIP wala option sab se asaan hai: <code>all_clips.zip</code> mein saari clips, thumbnails aur titles ek saath.</p>
+
     <label><input type="checkbox" id="own" style="width:auto"> Ye meri apni video hai ya mere paas permission hai</label>
     <p class="muted" style="color:#ffb86b">⚠️ Copyright: Dusray ki copyrighted video ko clip, caption ya face-track karne se wo copyright-free NAHI banti. Sirf apni, Creative Commons, public domain, ya permission wali video post karo, warna Content ID / strike ka risk hai.</p>
     <label><input type="checkbox" id="emoji" checked style="width:auto"> Auto Emoji on</label>
@@ -145,7 +153,7 @@
   }
   document.getElementById('go').onclick=()=>{
     if(!url.value.trim() && !upload.files.length){document.getElementById('out').textContent='Pehle video link dalo ya video/movie file upload karo.';return;}
-    const job={url:url.value,file:upload.files.length?upload.files[0].name:null,clips:+clips.value||5,duration:duration.value,language:lang.value,subtitle_language:sublang.value,subtitles:sublang.value!=='none',fit:fit.value,qualities:[...document.querySelectorAll('.q:checked')].map(x=>x.value),own:document.getElementById('own').checked,emoji:document.getElementById('emoji').checked,watermark:false,at:new Date().toISOString()};
+    const job={url:url.value,file:upload.files.length?upload.files[0].name:null,clips:+clips.value||5,duration:duration.value,download_type:document.getElementById('dltype').value,language:lang.value,subtitle_language:sublang.value,subtitles:sublang.value!=='none',fit:fit.value,qualities:[...document.querySelectorAll('.q:checked')].map(x=>x.value),own:document.getElementById('own').checked,emoji:document.getElementById('emoji').checked,watermark:false,at:new Date().toISOString()};
     const jobs=JSON.parse(localStorage.getItem('clipJobs')||'[]'); jobs.unshift(job); localStorage.setItem('clipJobs',JSON.stringify(jobs));
     document.getElementById('out').innerHTML=`<span class="ok">✔ Job save ho gayi:</span> ${job.clips} clips, language=${job.language}, subtitles=${job.subtitle_language}, style=${job.fit}, qualities=${job.qualities.join(', ')} (without watermark). Har clip ready honay par us ke alag download buttons milenge: ${job.qualities.map(q=>`<button type="button" disabled title="Clip ready honay ke baad active hoga">⬇ ${q}</button>`).join(' ')}<br>Ab GitHub repo mein Actions → Make Clips (Free) mein yehi details dal kar Run karo, ya ye job Muse mein Jaan ko bhej do, wo clips bana dega.`;
     update();

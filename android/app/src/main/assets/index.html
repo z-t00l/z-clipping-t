@@ -68,6 +68,23 @@
         </select>
       </div>
       <div>
+        <label for="sublang">Subtitles Ki Language (apni marzi se select karo)</label>
+        <select id="sublang">
+          <option value="auto" selected>Auto (video wali language)</option>
+          <option value="none">Without Subtitles (koi subtitles nahi)</option>
+          <option value="en">English</option><option value="ur">Urdu</option>
+          <option value="hi">Hindi</option><option value="ar">Arabic</option>
+          <option value="es">Spanish</option><option value="fr">French</option>
+          <option value="de">German</option><option value="pt">Portuguese</option>
+          <option value="tr">Turkish</option><option value="id">Indonesian</option>
+          <option value="bn">Bengali</option><option value="pa">Punjabi</option>
+          <option value="ru">Russian</option><option value="ja">Japanese</option>
+          <option value="ko">Korean</option><option value="zh">Chinese</option>
+        </select>
+      </div>
+    </div>
+    <div class="row">
+      <div>
         <label for="fit">Vertical Style</label>
         <select id="fit">
           <option value="face" selected>Face Tracking (best)</option>
@@ -87,7 +104,7 @@
     <label><input type="checkbox" id="own" style="width:auto"> Ye meri apni video hai ya mere paas permission hai</label>
     <p class="muted" style="color:#ffb86b">⚠️ Copyright: Dusray ki copyrighted video ko clip, caption ya face-track karne se wo copyright-free NAHI banti. Sirf apni, Creative Commons, public domain, ya permission wali video post karo, warna Content ID / strike ka risk hai.</p>
     <label><input type="checkbox" id="emoji" checked style="width:auto"> Auto Emoji on</label>
-    <label><input type="checkbox" id="translate" style="width:auto"> Subtitles English mein translate karo</label>
+    <p class="muted">Subtitles ki language upar se select karo. <b>Without Subtitles</b> select karne se saaf clips banengi, koi captions nahi lagenge. English ke ilawa kisi language ke subtitles YouTube captions se ya auto-translate se bante hain, translation kabhi kabhi perfect nahi hoti.</p>
 
     <button class="cta" id="go">Clips Banao — Free</button>
     <p id="out" class="muted"></p>
@@ -103,16 +120,16 @@
   const chips=[...document.querySelectorAll('.chip')], clips=document.getElementById('clips');
   chips.forEach(c=>c.onclick=()=>{chips.forEach(x=>x.classList.remove('active'));c.classList.add('active');clips.value=c.dataset.n;update();});
   clips.oninput=()=>{chips.forEach(x=>x.classList.toggle('active',x.dataset.n===clips.value));update();};
-  const url=document.getElementById('url'), lang=document.getElementById('lang'), fit=document.getElementById('fit');
-  [url,lang,fit].forEach(e=>e.oninput=update); document.querySelectorAll('.q').forEach(e=>e.onchange=update);
+  const url=document.getElementById('url'), lang=document.getElementById('lang'), fit=document.getElementById('fit'), sublang=document.getElementById('sublang');
+  [url,lang,fit,sublang].forEach(e=>e.oninput=update); document.querySelectorAll('.q').forEach(e=>e.onchange=update);
   function update(){
-    const qs=[...document.querySelectorAll('.q:checked')].map(x=>x.value).join(',')||'720p'; document.getElementById('cmd').textContent=`python clipper.py --url "${url.value||'...'}" --clips ${clips.value||5} --language ${lang.value} --fit ${fit.value} --qualities ${qs}`;
+    const qs=[...document.querySelectorAll('.q:checked')].map(x=>x.value).join(',')||'720p'; document.getElementById('cmd').textContent=`python clipper.py --url "${url.value||'...'}" --clips ${clips.value||5} --language ${lang.value} --subtitle-language ${sublang.value} --fit ${fit.value} --qualities ${qs}`;
   }
   document.getElementById('go').onclick=()=>{
     if(!url.value.trim()){document.getElementById('out').textContent='Pehle YouTube link dalo.';return;}
-    const job={url:url.value,clips:+clips.value||5,language:lang.value,fit:fit.value,qualities:[...document.querySelectorAll('.q:checked')].map(x=>x.value),own:document.getElementById('own').checked,emoji:document.getElementById('emoji').checked,translate:document.getElementById('translate').checked,watermark:false,at:new Date().toISOString()};
+    const job={url:url.value,clips:+clips.value||5,language:lang.value,subtitle_language:sublang.value,subtitles:sublang.value!=='none',fit:fit.value,qualities:[...document.querySelectorAll('.q:checked')].map(x=>x.value),own:document.getElementById('own').checked,emoji:document.getElementById('emoji').checked,watermark:false,at:new Date().toISOString()};
     const jobs=JSON.parse(localStorage.getItem('clipJobs')||'[]'); jobs.unshift(job); localStorage.setItem('clipJobs',JSON.stringify(jobs));
-    document.getElementById('out').innerHTML=`<span class="ok">✔ Job save ho gayi:</span> ${job.clips} clips, language=${job.language}, style=${job.fit}, qualities=${job.qualities.join(', ')} (without watermark). Har clip ready honay par us ke alag download buttons milenge: ${job.qualities.map(q=>`<button type="button" disabled title="Clip ready honay ke baad active hoga">⬇ ${q}</button>`).join(' ')}<br>Ab GitHub repo mein Actions → Make Clips (Free) mein yehi details dal kar Run karo, ya ye job Muse mein Jaan ko bhej do, wo clips bana dega.`;
+    document.getElementById('out').innerHTML=`<span class="ok">✔ Job save ho gayi:</span> ${job.clips} clips, language=${job.language}, subtitles=${job.subtitle_language}, style=${job.fit}, qualities=${job.qualities.join(', ')} (without watermark). Har clip ready honay par us ke alag download buttons milenge: ${job.qualities.map(q=>`<button type="button" disabled title="Clip ready honay ke baad active hoga">⬇ ${q}</button>`).join(' ')}<br>Ab GitHub repo mein Actions → Make Clips (Free) mein yehi details dal kar Run karo, ya ye job Muse mein Jaan ko bhej do, wo clips bana dega.`;
     update();
   };
   update();

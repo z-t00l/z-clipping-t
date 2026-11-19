@@ -3,75 +3,56 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ZUBI TOOL — AI Video Clipping (Free)</title>
+<title>ZUBI TOOL — AI Video Clipping</title>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:'Segoe UI',system-ui,Arial,sans-serif;background:#f4f6fb;color:#17203a;line-height:1.55}
-  header{background:linear-gradient(120deg,#1b1040,#3b1d8f 55%,#0b3b8f);color:#fff;padding:26px 16px 30px;text-align:center}
-  header .logo{font-size:34px;font-weight:900;letter-spacing:1px}
-  header .logo span{color:#ffd60a}
-  header p{color:#cfd6ff;max-width:640px;margin:8px auto 0;font-size:15px}
-  .badges{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:14px}
-  .badges span{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.25);padding:5px 12px;border-radius:999px;font-size:12.5px;font-weight:600}
-  .wrap{max-width:880px;margin:-18px auto 40px;padding:0 14px}
-  .card{background:#fff;border:1px solid #e4e8f2;border-radius:16px;padding:20px;margin:16px 0;box-shadow:0 4px 18px rgba(23,32,58,.06)}
-  .step{display:flex;align-items:center;gap:10px;margin-bottom:14px}
-  .step .n{background:linear-gradient(120deg,#7c3aed,#2563eb);color:#fff;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;flex:none}
-  .step h2{font-size:18px}
-  label{display:block;margin:14px 0 6px;font-weight:650;font-size:14.5px}
-  input,select{width:100%;padding:12px 14px;border-radius:10px;border:1.5px solid #d5dbea;background:#fbfcff;color:#17203a;font-size:15.5px;outline:none}
+  body{font-family:'Segoe UI',system-ui,Arial,sans-serif;background:#0b0e17;color:#eef1ff;line-height:1.5}
+  header{padding:30px 16px 10px;text-align:center}
+  .logo{font-size:36px;font-weight:900;letter-spacing:1px}
+  .logo span{background:linear-gradient(90deg,#ff3d5a,#ff7a18);-webkit-background-clip:text;background-clip:text;color:transparent}
+  header p{color:#8b93b8;font-size:14px;margin-top:6px}
+  .wrap{max-width:760px;margin:14px auto 40px;padding:0 14px}
+  .card{background:#141927;border:1px solid #232a42;border-radius:18px;padding:20px;margin:14px 0}
+  .card h2{font-size:16px;margin-bottom:12px;color:#c7cdf5}
+  label{display:block;margin:13px 0 6px;font-weight:650;font-size:13.5px;color:#aeb6d8}
+  input,select{width:100%;padding:13px 14px;border-radius:12px;border:1.5px solid #2a3352;background:#0e1220;color:#eef1ff;font-size:15.5px;outline:none}
   input:focus,select:focus{border-color:#7c3aed}
-  .muted{color:#67718c;font-size:13.5px;margin-top:6px}
-  .chips{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
-  .chip{padding:9px 16px;border-radius:999px;border:1.5px solid #d5dbea;background:#f4f6fb;color:#17203a;cursor:pointer;font-weight:650;font-size:14.5px}
-  .chip.active{background:linear-gradient(120deg,#7c3aed,#2563eb);border-color:transparent;color:#fff}
-  .row{display:grid;grid-template-columns:1fr 1fr;gap:14px}@media(max-width:640px){.row{grid-template-columns:1fr}}
-  .feat{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
-  .feat div{background:#f4f6fb;border:1px solid #e4e8f2;border-radius:12px;padding:14px}
-  .feat b{display:block;margin-bottom:3px}
-  button.cta{width:100%;padding:16px;border:0;border-radius:14px;background:linear-gradient(120deg,#ff3d5a,#ff7a18);color:#fff;font-size:18px;font-weight:800;cursor:pointer;margin-top:18px;box-shadow:0 8px 20px rgba(255,61,90,.3)}
+  .chips{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0}
+  .chip{padding:9px 17px;border-radius:999px;border:1.5px solid #2a3352;background:#0e1220;color:#eef1ff;cursor:pointer;font-weight:700;font-size:14.5px}
+  .chip.active{background:linear-gradient(120deg,#7c3aed,#2563eb);border-color:transparent}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media(max-width:600px){.row{grid-template-columns:1fr}}
+  .check{display:flex;gap:9px;align-items:center;font-weight:600;font-size:14px;color:#dbe1ff;margin-top:14px}
+  .check input{width:auto}
+  button.cta{width:100%;padding:16px;border:0;border-radius:14px;background:linear-gradient(120deg,#ff3d5a,#ff7a18);color:#fff;font-size:18px;font-weight:800;cursor:pointer;margin-top:18px}
   button.cta:active{transform:scale(.99)}
-  code{background:#eef1f8;padding:3px 7px;border-radius:6px;word-break:break-all;font-size:13.5px}
-  .ok{color:#15803d;font-weight:700}
-  .warn{background:#fff7e6;border:1px solid #ffd88a;border-radius:12px;padding:12px 14px;margin-top:14px;font-size:13.5px;color:#7a5b00}
-  .check{display:flex;gap:8px;align-items:flex-start;font-weight:600;font-size:14.5px}
-  .check input{width:auto;margin-top:3px}
-  #progwrap{margin-top:16px;background:#f4f6fb;border:1px solid #e4e8f2;border-radius:12px;padding:14px}
-  #progbar-wrap{background:#e2e8f0;border-radius:99px;height:16px;overflow:hidden;margin-top:8px}
+  #progwrap{margin-top:16px;display:none}
+  #progbar-wrap{background:#232a42;border-radius:99px;height:15px;overflow:hidden;margin-top:7px}
   #progbar{background:linear-gradient(90deg,#7c3aed,#22c55e);height:100%;width:0%;transition:width .4s}
-  .jobcard{background:#f4f6fb;border:1px solid #e4e8f2;border-radius:12px;padding:13px}
-  footer{text-align:center;color:#67718c;font-size:13px;padding:0 16px 30px}
+  .muted{color:#8b93b8;font-size:13px;margin-top:7px}
+  .ok{color:#4ade80;font-weight:700}
+  .warn{color:#ffb86b;font-size:12.5px;margin-top:10px}
+  .jobcard{background:#0e1220;border:1px solid #232a42;border-radius:12px;padding:12px}
+  footer{text-align:center;color:#5b648a;font-size:12.5px;padding-bottom:26px}
 </style>
 </head>
 <body>
 <header>
   <div class="logo">ZUBI <span>TOOL</span></div>
-  <p>Long video se best viral Shorts, Reels aur TikTok clips — AI face tracking, auto subtitles, professional thumbnails. Bilkul free, koi watermark nahi.</p>
-  <div class="badges"><span>100% Free</span><span>Face Tracking</span><span>Auto Subtitles</span><span>Har Language</span><span>HD / 4K</span><span>No Watermark</span></div>
+  <p>AI Video Clipping — Free, No Watermark</p>
 </header>
 
 <div class="wrap">
   <section class="card">
-    <div class="feat">
-      <div><b>Face Tracking</b><span class="muted">Speaker ko follow karke smooth 9:16 crop</span></div>
-      <div><b>Auto Subtitles + Emoji</b><span class="muted">99 languages auto-detect, apni marzi ki subtitle language</span></div>
-      <div><b>Viral Score</b><span class="muted">Hook + Pacing + Engagement se best clips pehle</span></div>
-      <div><b>Pro Thumbnails + Titles</b><span class="muted">Har clip ke saath attractive thumbnail, title, hashtags</span></div>
-    </div>
-  </section>
-
-  <section class="card">
-    <div class="step"><div class="n">1</div><h2>Video Select Karo</h2></div>
-    <label for="url">Video Ka Link (YouTube, TikTok, Instagram, Facebook, X, Vimeo, ya direct MP4 link)</label>
-    <input id="url" placeholder="https://... (kisi bhi site ka video link)">
-    <label for="upload">Ya Apni Video / Movie Upload Karo</label>
+    <h2>Video</h2>
+    <label for="url">Video Link (YouTube, TikTok, Instagram, Facebook, ya koi bhi)</label>
+    <input id="url" placeholder="https://...">
+    <label for="upload">Ya Video / Movie Upload Karo</label>
     <input id="upload" type="file" accept="video/*,.mkv,.mov,.webm">
-    <p class="muted">Upload ki hui video/movie se bhi clips banenge. File select karne par neeche wali command mein file ka naam aa jayega.</p>
   </section>
 
   <section class="card">
-    <div class="step"><div class="n">2</div><h2>Clips Ki Settings</h2></div>
-    <label>Kitni Clips Chahiye?</label>
+    <h2>Settings</h2>
+    <label>Kitni Clips?</label>
     <div class="chips" id="chips">
       <button type="button" class="chip" data-n="1">1</button>
       <button type="button" class="chip" data-n="2">2</button>
@@ -83,13 +64,11 @@
       <button type="button" class="chip" data-n="20">20</button>
     </div>
     <input id="clips" type="number" min="1" max="100" value="5" aria-label="Clips ki quantity">
-    <p class="muted">Upar se choose karo ya apni marzi ka number likho — jitni chahiye utni.</p>
-
     <div class="row">
       <div>
-        <label for="lang">Video Ki Language</label>
+        <label for="lang">Video Language</label>
         <select id="lang">
-          <option value="auto" selected>Auto Detect (har language)</option>
+          <option value="auto" selected>Auto Detect</option>
           <option value="ur">Urdu</option><option value="en">English</option>
           <option value="hi">Hindi</option><option value="ar">Arabic</option>
           <option value="es">Spanish</option><option value="fr">French</option>
@@ -99,10 +78,10 @@
         </select>
       </div>
       <div>
-        <label for="sublang">Subtitles Ki Language (apni marzi se select karo)</label>
+        <label for="sublang">Subtitles Language</label>
         <select id="sublang">
-          <option value="auto" selected>Auto (video wali language)</option>
-          <option value="none">Without Subtitles (koi subtitles nahi)</option>
+          <option value="auto" selected>Auto (video wali)</option>
+          <option value="none">Without Subtitles</option>
           <option value="en">English</option><option value="ur">Urdu</option>
           <option value="hi">Hindi</option><option value="ar">Arabic</option>
           <option value="es">Spanish</option><option value="fr">French</option>
@@ -116,16 +95,16 @@
     </div>
     <div class="row">
       <div>
-        <label for="fit">Vertical Style</label>
+        <label for="fit">Style</label>
         <select id="fit">
-          <option value="face" selected>Face Tracking (best)</option>
+          <option value="face" selected>Face Tracking</option>
           <option value="blur">Blur Background</option>
         </select>
       </div>
       <div>
-        <label for="duration">Har Clip Ki Duration</label>
+        <label for="duration">Clip Duration</label>
         <select id="duration">
-          <option value="auto" selected>Auto (25-60 sec, best moments)</option>
+          <option value="auto" selected>Auto (25-60 sec)</option>
           <option value="15">15 sec</option>
           <option value="30">30 sec</option>
           <option value="45">45 sec</option>
@@ -134,80 +113,58 @@
         </select>
       </div>
     </div>
-    <label class="check" style="margin-top:16px"><input type="checkbox" id="emoji" checked> Auto Emoji on (captions mein words ke hisab se emoji)</label>
+    <label class="check"><input type="checkbox" id="emoji" checked> Auto Emoji</label>
+    <label class="check"><input type="checkbox" id="own"> Meri apni video hai / permission hai</label>
+    <p class="warn">Sirf apni ya permission wali video post karo — dusray ki video clip karne se copyright-free nahi banti.</p>
   </section>
 
   <section class="card">
-    <div class="step"><div class="n">3</div><h2>Download Options</h2></div>
-    <label>Download Quality: Auto HD</label>
-    <p class="muted" style="background:#eef6ff;border:1px solid #c7defc;border-radius:10px;padding:11px 13px">Quality khud select hoti hai: source video jitni HD hogi, clips utni hi best quality mein banengi (720p source = HD, 1080p = Full HD, 4K = 4K). Alag se choose karne ki zaroorat nahi, hamesha sab se best quality milegi, without watermark.</p>
-    <label for="dltype">Download Ka Type (clips ready honay par)</label>
+    <h2>Download</h2>
+    <label>Quality: <b style="color:#4ade80">Auto HD</b> (source jitni HD, utni best)</label>
+    <label for="dltype">Download Type</label>
     <select id="dltype">
-      <option value="single" selected>Single Clip Download (har clip alag, har quality)</option>
-      <option value="all">All Clips — 1 Click Mein Sab</option>
-      <option value="zip">All Clips — ZIP File Mein</option>
+      <option value="single" selected>Single Clip</option>
+      <option value="all">All Clips — 1 Click</option>
+      <option value="zip">All Clips — ZIP</option>
     </select>
-    <p class="muted">Har clip ke saath best attractive thumbnail aur best title + hashtags + caption milta hai. Zyada clips hon to ZIP sab se asaan hai: <code>all_clips.zip</code> mein saari clips, thumbnails aur titles ek saath.</p>
-
-    <label class="check" style="margin-top:16px"><input type="checkbox" id="own"> Ye meri apni video hai ya mere paas permission hai</label>
-    <div class="warn">Copyright: Dusray ki copyrighted video ko clip, caption ya face-track karne se wo copyright-free NAHI banti. Sirf apni, Creative Commons, public domain, ya permission wali video post karo, warna Content ID / strike ka risk hai.</div>
-
-    <button class="cta" id="go">Clips Banao — Free</button>
-
-    <div id="progwrap" style="display:none">
+    <button class="cta" id="go">Clips Banao</button>
+    <div id="progwrap">
       <div style="display:flex;justify-content:space-between;font-size:13.5px;font-weight:650"><span id="progstage">Processing...</span><span id="progpct">0%</span></div>
       <div id="progbar-wrap"><div id="progbar"></div></div>
       <p class="muted" id="progleft">100% baqi hai</p>
     </div>
-    <p class="muted">Jab clips GitHub Actions par banti hain to wahan live <b>PROGRESS %</b> line chalti hai: kitna % done hua aur kitna baqi hai, har clip ke saath. Clips ready honay par output mein <b>gallery.html</b> bhi banti hai jahan saari clips play aur download ho sakti hain.</p>
     <p id="out" class="muted"></p>
-    <p class="muted">Ye page GitHub Pages par free host hoti hai. Asli processing GitHub Actions (free) par hoti hai: repo mein <b>Actions → Make Clips (Free) → Run workflow</b> mein yehi link, clips quantity aur language dalo, clips artifact mein download ho jayengi. APK bhi <b>Actions → Build APK</b> se free banta hai.</p>
   </section>
 
   <section class="card">
-    <div class="step"><div class="n">4</div><h2>Clips Gallery</h2></div>
-    <p class="muted">Tumhari saved jobs yahan gallery ki tarah dikhti hain. Asli clips ready honay par har job ki <b>gallery.html</b> mein saari clips thumbnail, title, viral score aur download buttons ke saath milti hain: single clip, all clips 1 click, aur ZIP.</p>
-    <div id="gallery" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-top:12px"></div>
-  </section>
-
-  <section class="card">
-    <h3 style="font-size:16px;margin-bottom:8px">Command (computer par chalane ke liye)</h3>
-    <p><code id="cmd">python clipper.py --url "..." --clips 5 --language auto --fit face</code></p>
+    <h2>Clips Gallery</h2>
+    <div id="gallery" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px"></div>
   </section>
 </div>
-<footer>ZUBI TOOL — Free AI Video Clipping | GitHub par chalta hai, paisay nahi lagtay</footer>
+<footer>ZUBI TOOL</footer>
 
 <script>
   const chips=[...document.querySelectorAll('.chip')], clips=document.getElementById('clips');
-  chips.forEach(c=>c.onclick=()=>{chips.forEach(x=>x.classList.remove('active'));c.classList.add('active');clips.value=c.dataset.n;update();});
-  clips.oninput=()=>{chips.forEach(x=>x.classList.toggle('active',x.dataset.n===clips.value));update();};
+  chips.forEach(c=>c.onclick=()=>{chips.forEach(x=>x.classList.remove('active'));c.classList.add('active');clips.value=c.dataset.n;});
+  clips.oninput=()=>{chips.forEach(x=>x.classList.toggle('active',x.dataset.n===clips.value));};
   const url=document.getElementById('url'), lang=document.getElementById('lang'), fit=document.getElementById('fit'), sublang=document.getElementById('sublang'), duration=document.getElementById('duration'), upload=document.getElementById('upload');
-  [url,lang,fit,sublang,duration].forEach(e=>e.oninput=update); upload.onchange=update;
-  function update(){
-    const qs='auto';
-    const dur=duration.value==='auto'?'':` --duration ${duration.value}`;
-    const src=upload.files.length?`--file "${upload.files[0].name}"`:`--url "${url.value||'...'}"`;
-    document.getElementById('cmd').textContent=`python clipper.py ${src} --clips ${clips.value||5} --language ${lang.value} --subtitle-language ${sublang.value} --fit ${fit.value}${dur} --qualities ${qs}`;
-  }
   function renderGallery(){
     const jobs=JSON.parse(localStorage.getItem('clipJobs')||'[]');
     const g=document.getElementById('gallery'); if(!g) return;
-    g.innerHTML=jobs.length? jobs.map((j,i)=>`<div class="jobcard"><div style="font-weight:700">Job ${jobs.length-i}: ${j.clips} clips</div><div style="color:#67718c;font-size:12px;word-break:break-all">${(j.file||j.url||'').slice(0,60)}</div><div style="color:#2563eb;font-size:12px">Duration: ${j.duration||'auto'}s | Subtitles: ${j.subtitle_language} | Download: ${j.download_type||'single'}</div><div style="color:#67718c;font-size:11px">${new Date(j.at).toLocaleString()}</div></div>`).join('') : '<p class="muted">Abhi koi job nahi. Upar se pehli job banao.</p>';
+    g.innerHTML=jobs.length? jobs.map((j,i)=>`<div class="jobcard"><div style="font-weight:700">Job ${jobs.length-i}: ${j.clips} clips</div><div style="color:#8b93b8;font-size:12px;word-break:break-all">${(j.file||j.url||'').slice(0,50)}</div><div style="color:#7dd3fc;font-size:12px">${j.duration||'auto'}s | ${j.subtitle_language} | ${j.download_type||'single'}</div><div style="color:#8b93b8;font-size:11px">${new Date(j.at).toLocaleString()}</div></div>`).join('') : '<p class="muted">Abhi koi job nahi.</p>';
   }
   document.getElementById('go').onclick=()=>{
-    if(!url.value.trim() && !upload.files.length){document.getElementById('out').textContent='Pehle video link dalo ya video/movie file upload karo.';return;}
+    if(!url.value.trim() && !upload.files.length){document.getElementById('out').textContent='Pehle video link dalo ya file upload karo.';return;}
     const job={url:url.value,file:upload.files.length?upload.files[0].name:null,clips:+clips.value||5,duration:duration.value,download_type:document.getElementById('dltype').value,language:lang.value,subtitle_language:sublang.value,subtitles:sublang.value!=='none',fit:fit.value,qualities:['auto'],own:document.getElementById('own').checked,emoji:document.getElementById('emoji').checked,watermark:false,at:new Date().toISOString()};
     const jobs=JSON.parse(localStorage.getItem('clipJobs')||'[]'); jobs.unshift(job); localStorage.setItem('clipJobs',JSON.stringify(jobs));
     const pw=document.getElementById('progwrap'), pb=document.getElementById('progbar'), pp=document.getElementById('progpct'), ps=document.getElementById('progstage'), pl=document.getElementById('progleft');
     pw.style.display='block';
-    const stages=[[15,'Link check ho raha hai'],[35,'Settings save ho rahi hain'],[60,'Command tayyar ho rahi hai'],[85,'Gallery mein job add ho rahi hai'],[100,'Job ready! GitHub Actions par PROGRESS % live chalegi']];
+    const stages=[[15,'Link check...'],[35,'Settings save...'],[60,'Job tayyar...'],[85,'Gallery update...'],[100,'Ready!']];
     let si=0;
     const timer=setInterval(()=>{ if(si>=stages.length){clearInterval(timer); renderGallery(); return;} const [pct,txt]=stages[si++]; pb.style.width=pct+'%'; pp.textContent=pct+'%'; ps.textContent=txt; pl.textContent=(100-pct)+'% baqi hai'; },450);
-    document.getElementById('out').innerHTML=`<span class="ok">Job save ho gayi:</span> ${job.clips} clips, language=${job.language}, subtitles=${job.subtitle_language}, style=${job.fit}, qualities=Auto HD (source jitni HD, utni best) (without watermark). Ab GitHub repo mein Actions → Make Clips (Free) mein yehi details dal kar Run karo, ya ye job Muse mein Jaan ko bhej do, wo clips bana dega.`;
-    update();
+    document.getElementById('out').innerHTML=`<span class="ok">Job ready:</span> ${job.clips} clips, Auto HD quality. GitHub Actions → Make Clips (Free) mein Run karo, ya Jaan ko bhej do.`;
   };
   renderGallery();
-  update();
 </script>
 </body>
 </html>

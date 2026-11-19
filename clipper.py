@@ -502,16 +502,16 @@ def make_title_hashtags(text):
     caption = f"{title}\n\n{' '.join(tags)}"
     return title, " ".join(tags), caption
 
-def make_thumbnail(clip_file: Path, title: str, out_path: Path):
-    """Best attractive thumbnail: sab se sharp + bada face wala frame,
-    colors enhance karke us par bold title likha hota hai."""
+def make_thumbnail(clip_file: Path, title: str, out_path: Path, style: int = 0, viral_score=None):
+    """Viral-style thumbnail: sharp+bada face frame, zyada saturated colors,
+    boht bara bold text (2-4 words), thick stroke, bright style variants."""
     import cv2
-    from PIL import Image, ImageDraw, ImageFont, ImageEnhance
+    from PIL import Image, ImageDraw, ImageFont, ImageEnhance, ImageFilter
     cap = cv2.VideoCapture(str(clip_file))
     fps = cap.get(cv2.CAP_PROP_FPS) or 25
     total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
     cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
-    best, best_score = None, -1
+    best, best_score, best_face = None, -1, None
     step = max(1, int(fps * 0.5))
     for n in range(0, max(total, 1), step):
         cap.set(cv2.CAP_PROP_POS_FRAMES, n)
@@ -526,40 +526,69 @@ def make_thumbnail(clip_file: Path, title: str, out_path: Path):
         score = face_area * 4000 + min(sharp, 800) / 4 + bright_score
         if score > best_score:
             best_score, best = score, frame.copy()
+            if len(faces):
+                fx, fy, fw, fh = max(faces, key=lambda f: f[2]*f[3])
+                best_face = (fx*2, fy*2, fw*2, fh*2)  # 360x640 -> frame coords scale approx (frame resized in clip is 720x1280)
     cap.release()
     if best is None:
         run(["ffmpeg","-y","-ss","1","-i",str(clip_file),"-frames:v","1",str(out_path)])
         return
     img = Image.fromarray(cv2.cvtColor(best, cv2.COLOR_BGR2RGB)).resize((720, 1280))
-    img = ImageEnhance.Color(img).enhance(1.3)
-    img = ImageEnhance.Contrast(img).enhance(1.12)
-    img = ImageEnhance.Sharpness(img).enhance(1.4)
-    # title text: neeche dark band par bold white text
-    draw = ImageDraw.Draw(img, "RGBA")
-    clean_title = re.sub(r"[^\w\s?!.,'’\-]", "", title).strip()
-    words = clean_title.split()
-    lines, line = [], ""
-    for wd in words:
-        if len(line) + len(wd) + 1 > 22 and line:
-            lines.append(line); line = wd
-        else:
-            line = f"{line} {wd}".strip()
-        if len(lines) >= 2: break
-    if line and len(lines) < 3: lines.append(line)
-    lines = lines[:3]
+    img = ImageEnhance.Color(img).enhance(1.55)
+    img = ImageEnhance.Contrast(img).enhance(1.18)
+    img = ImageEnhance.Sharpness(img).enhance(1.5)
+    # short hook words: title ke pehle 4 words, uppercase
+    clean = re.sub(r"[^\w\s?!]", "", title).strip().upper()
+    words = clean.split()[:4]
+    # styles: (text_color, accent, position)
+    styles = [
+        ((255, 235, 0), (255, 45, 45), "top"),      # yellow text, red accent
+        ((255, 255, 255), (0, 230, 90), "bottom"),  # white text, green accent
+        ((255, 255, 255), (255, 235, 0), "center"), # white text center, yellow accent
+        ((0, 255, 140), (255, 255, 255), "top"),    # green text
+    ]
+    text_color, accent, pos = styles[style % len(styles)]
+    font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+    # font size words ke hisaab se
+    size = 118 if len(words) <= 2 else (98 if len(words) == 3 else 84)
     try:
-        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 52)
+        font = ImageFont.truetype(font_path, size)
     except Exception:
         font = ImageFont.load_default()
-    band_h = 70 + 62 * len(lines)
-    draw.rectangle([0, 1280 - band_h, 720, 1280], fill=(0, 0, 0, 150))
-    y = 1280 - band_h + 30
+    draw = ImageDraw.Draw(img, "RGBA")
+    lines = []
+    if len(words) >= 3:
+        lines = [" ".join(words[:2]), " ".join(words[2:])]
+    else:
+        lines = [" ".join(words)] if words else ["WATCH THIS!"]
+    line_h = size + 16
+    block_h = line_h * len(lines)
+    if pos == "top": y0 = 50
+    elif pos == "bottom": y0 = 1280 - block_h - 60
+    else: y0 = (1280 - block_h) // 2
+    # peeche halki dark band taake text saaf parha jaye
+    draw.rectangle([0, y0 - 26, 720, y0 + block_h + 10], fill=(0, 0, 0, 110))
+    # accent line
+    draw.rectangle([0, y0 - 26, 720, y0 - 14], fill=accent + (255,))
+    y = y0
     for ln in lines:
         bbox = draw.textbbox((0, 0), ln, font=font)
         x = (720 - (bbox[2] - bbox[0])) / 2
-        draw.text((x, y), ln, font=font, fill=(255, 255, 255), stroke_width=3, stroke_fill=(0, 0, 0))
-        y += 62
-    img.save(out_path, "JPEG", quality=90)
+        draw.text((x, y), ln, font=font, fill=text_color, stroke_width=10, stroke_fill=(0, 0, 0))
+        y += line_h
+    # viral badge top-right
+    if viral_score:
+        try:
+            bfont = ImageFont.truetype(font_path, 40)
+        except Exception:
+            bfont = font
+        badge = f"VIRAL {int(viral_score)}"
+        bb = draw.textbbox((0, 0), badge, font=bfont)
+        bw, bh = bb[2]-bb[0]+36, bb[3]-bb[1]+24
+        bx, by = 720 - bw - 24, 24
+        draw.rounded_rectangle([bx, by, bx+bw, by+bh], radius=18, fill=(255, 45, 45, 240))
+        draw.text((bx+18, by+8), badge, font=bfont, fill=(255, 255, 255))
+    img.save(out_path, "JPEG", quality=92)
 
 def process(url=None, file=None, max_clips=5, fit="face", use_emoji=True, out_root="output",
             language=None, translate=False, subtitle_language=None, min_sec=25, max_sec=60,
@@ -615,7 +644,7 @@ def process(url=None, file=None, max_clips=5, fit="face", use_emoji=True, out_ro
         # best attractive thumbnail (sharp frame + bada face + title text)
         thumb = clip_dir/"thumbnail.jpg"
         title, tags, caption = make_title_hashtags(c["text"])
-        make_thumbnail(final, title, thumb)
+        make_thumbnail(final, title, thumb, style=idx - 1, viral_score=c["score"].get("viral"))
         c["score"]["face_pct"] = face_pct
         results.append({"clip": idx, "file": str(final), "downloads": downloads, "thumbnail": str(thumb),
                         "watermark": False,

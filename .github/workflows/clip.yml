@@ -13,10 +13,16 @@ on:
         default: "5"
         type: string
       language:
-        description: "Language: auto ya en/ur/hi/ar/es/fr/de/pt/tr/id/bn/pa"
+        description: "Video ki language: auto ya en/ur/hi/ar/es/fr/de/pt/tr/id/bn/pa"
         required: true
         default: "auto"
         type: string
+      subtitle_language:
+        description: "Subtitles ki language khud select karo (none = without subtitles)"
+        required: true
+        default: "auto"
+        type: choice
+        options: ["auto", "none", "en", "ur", "hi", "ar", "es", "fr", "de", "pt", "tr", "id", "bn", "pa", "ru", "ja", "ko", "zh"]
       fit:
         description: "face (face tracking) ya blur"
         required: true
@@ -24,7 +30,7 @@ on:
         type: choice
         options: ["face", "blur"]
       translate_to_english:
-        description: "Subtitles English mein translate karna hai?"
+        description: "Subtitles English mein translate karna hai? (subtitle_language auto ho tab hi)"
         required: false
         default: false
         type: boolean
@@ -57,7 +63,7 @@ jobs:
           EXTRA=""
           if [ "${{ inputs.translate_to_english }}" = "true" ]; then EXTRA="$EXTRA --translate-to-english"; fi
           if [ "${{ inputs.i_own_this }}" = "true" ]; then EXTRA="$EXTRA --i-own-this"; fi
-          python clipper.py --url "${{ inputs.url }}" --clips "${{ inputs.clips }}" --language "${{ inputs.language }}" --fit "${{ inputs.fit }}" --qualities "${{ inputs.qualities }}" $EXTRA --out output
+          python clipper.py --url "${{ inputs.url }}" --clips "${{ inputs.clips }}" --language "${{ inputs.language }}" --subtitle-language "${{ inputs.subtitle_language }}" --fit "${{ inputs.fit }}" --qualities "${{ inputs.qualities }}" $EXTRA --out output
       - name: Upload clips (free artifact, 90 din tak)
         uses: actions/upload-artifact@v4
         with:

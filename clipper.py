@@ -689,11 +689,28 @@ video{{width:100%;aspect-ratio:9/16;object-fit:cover;background:#000}}
     (outdir/"gallery.html").write_text(html, encoding="utf-8")
     print(f"Gallery ready: {outdir/'gallery.html'}")
 
+def get_video_height(video):
+    """Source video ki height (quality auto select karne ke liye)."""
+    r = subprocess.run(["ffprobe","-v","error","-select_streams","v:0","-show_entries","stream=height",
+                        "-of","csv=p=0",str(video)], capture_output=True, text=True)
+    try:
+        return int(r.stdout.strip().splitlines()[0])
+    except Exception:
+        return 720
+
+def auto_quality_for(height):
+    """Source jitni HD hai, utni best quality: 4K/2K/1080p/720p."""
+    if height >= 2160: return "4k"
+    if height >= 1440: return "2k"
+    if height >= 1080: return "1080p"
+    return "720p"
+
 def process(url=None, file=None, max_clips=5, fit="face", use_emoji=True, out_root="output",
             language=None, translate=False, subtitle_language=None, min_sec=25, max_sec=60,
-            qualities=("720p","1080p"), i_own_this=False):
+            qualities=("auto",), i_own_this=False):
     if max_clips < 1:
         raise SystemExit("--clips kam az kam 1 hona chahiye")
+    auto_quality = any(str(q).lower() == "auto" for q in qualities)
     qualities = [q.lower() for q in qualities if q.lower() in QUALITIES] or ["720p"]
     outdir = Path(out_root); outdir.mkdir(parents=True, exist_ok=True)
     work = outdir / "work"; work.mkdir(exist_ok=True)
@@ -704,9 +721,13 @@ def process(url=None, file=None, max_clips=5, fit="face", use_emoji=True, out_ro
         if i_own_this:
             info["copyright_status"] = "User ne confirm kiya ke ye unki apni video hai ya unke paas permission hai. Phir bhi platform rules check karo."
         print("COPYRIGHT CHECK:", info.get("license"), "-", info.get("copyright_status"))
-    max_h = 2160 if any(q in ("2k","4k") for q in qualities) else 1080
+    max_h = 2160 if (auto_quality or any(q in ("2k","4k") for q in qualities)) else 1080
     report_progress(outdir, 2, "Shuru ho raha hai")
     video = Path(file) if file else download(url, work, max_height=max_h, language=language, subtitle_language=subtitle_language)
+    if auto_quality:
+        src_h = get_video_height(video)
+        qualities = [auto_quality_for(src_h)]
+        print(f"Quality AUTO: source {src_h}p hai, is liye clips {qualities[0]} mein banengi (sab se best possible)")
     report_progress(outdir, 15, "Video download ho gayi, ab transcript ban raha hai")
     words = get_words(video, work, language=language, translate=translate, subtitle_language=subtitle_language)
     report_progress(outdir, 35, "Transcript ready, best clips dhoondhe ja rahe hain")
@@ -795,7 +816,7 @@ if __name__ == "__main__":
     ap.add_argument("--min-sec", type=int, default=25)
     ap.add_argument("--max-sec", type=int, default=60)
     ap.add_argument("--no-emoji", action="store_true")
-    ap.add_argument("--qualities", default="720p,1080p", help="Download qualities, comma se alag: 720p,1080p,2k,4k (har ek ki alag file, without watermark)")
+    ap.add_argument("--qualities", default="auto", help="Download quality: auto (source jitni HD hai utni best, default) ya comma se alag: 720p,1080p,2k,4k (without watermark)")
     ap.add_argument("--i-own-this", action="store_true", help="Confirm karo ke ye meri apni video hai ya mere paas permission hai")
     ap.add_argument("--out", default="output")
     a = ap.parse_args()

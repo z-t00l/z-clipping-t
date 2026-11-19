@@ -92,7 +92,7 @@ def get_video_info(url):
         if r.returncode != 0:
             return {"license": "unknown", "copyright_status": "License check nahi ho saka. Sirf apni / CC / permission wali video use karo."}
         info = json.loads(r.stdout)
-        lic = info.get("license") or "Standard YouTube License"
+        lic = info.get("license") or "Standard License (is site ki apni terms)"
         is_cc = "creative commons" in lic.lower()
         status = ("Creative Commons license mili hai. Terms ke hisab se attribution de kar use kar sakte ho, phir bhi license parho."
                   if is_cc else
@@ -110,8 +110,14 @@ def download(url, outdir: Path, max_height=1080, language=None, subtitle_languag
     fmt = f"bestvideo[height<={max_height}][ext=mp4]+bestaudio[ext=m4a]/best[height<={max_height}]"
     # Pehle sirf video download karo. Subtitles alag step mein hain taake
     # subtitle rate-limit (HTTP 429) poori video download ko fail na kare.
-    run(yt_dlp_cmd("-f", fmt,
-         "--merge-output-format", "mp4", "-o", tmpl, url))
+    # Koi bhi link chalega: YouTube, TikTok, Instagram, Facebook, X, Vimeo,
+    # ya direct MP4/MOV link (yt-dlp 1000+ sites support karta hai).
+    try:
+        run(yt_dlp_cmd("-f", fmt,
+             "--merge-output-format", "mp4", "-o", tmpl, url))
+    except SystemExit:
+        # direct media link / single-format sites ke liye fallback
+        run(yt_dlp_cmd("-f", "best", "--merge-output-format", "mp4", "-o", tmpl, url))
     # Phir limited languages mein subtitles try karo. "all" languages
     # mangne se YouTube 429 de deta hai, is liye sirf zaroori languages.
     # User ne subtitles language select ki hai to wo sab se pehle mango.
@@ -392,6 +398,7 @@ def render_face_tracked(video: Path, start, end, out_silent: Path, fit="face"):
     writer = cv2.VideoWriter(str(out_silent), fourcc, fps, (720,1280))
     cx = None          # current crop center (source pixels)
     target = None      # jahan crop ko jana hai
+    history = []       # recent detections (median filter ke liye)
     prev_small = None  # scene-cut detection ke liye
     frames = 0; face_frames = 0
     total = int((end-start)*fps)
@@ -438,21 +445,30 @@ def render_face_tracked(video: Path, start, end, out_silent: Path, fit="face"):
                 if scene_cut or target is None:
                     target = new_target
                     cx = new_target  # cut par foran snap, pan nahi
-                elif abs(new_target - target) > w*0.02:  # dead zone
-                    target = 0.6*target + 0.4*new_target
+                    history = [new_target]
+                elif abs(new_target - target) > w*0.035:  # dead zone
+                    # median filter: detection ki chhoti jitter khatam
+                    history.append(new_target)
+                    history = history[-7:]
+                    med = sorted(history)[len(history)//2]
+                    target = 0.8*target + 0.2*med
         if cx is None:
             cx = target = w/2
         if target is None:
             target = cx
         # --- smooth pan: har frame target ki taraf limited speed se ---
-        max_step = max(2.0, w*0.004)  # ~0.4% width per frame
+        max_step = max(1.5, w*0.0025)  # ~0.25% width per frame, bohat smooth
         delta = target - cx
         if abs(delta) > max_step:
             cx += max_step if delta > 0 else -max_step
         else:
             cx = target
-        x1 = int(max(0, min(w-crop_w, cx-crop_w/2)))
-        cropped = frame[:, x1:x1+crop_w]
+        # subpixel shift: integer crop ki 1px jitter bhi nahi hogi
+        import numpy as np
+        shift = float(max(0.0, min(w-crop_w, cx-crop_w/2)))
+        M = np.float32([[1, 0, -shift], [0, 1, 0]])
+        shifted = cv2.warpAffine(frame, M, (w, h), borderMode=cv2.BORDER_REPLICATE)
+        cropped = shifted[:, 0:crop_w]
         writer.write(cv2.resize(cropped, (720,1280)))
         frames+=1
     cap.release(); writer.release()
@@ -542,7 +558,8 @@ def process(url=None, file=None, max_clips=5, fit="face", use_emoji=True, out_ro
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("--url"); ap.add_argument("--file")
+    ap.add_argument("--url", help="Kisi bhi site ka video link: YouTube, TikTok, Instagram, Facebook, X, Vimeo, Twitch, ya direct MP4/MOV link")
+    ap.add_argument("--file", help="Apni video/movie file ka path (upload ki hui file se clips banane ke liye): mp4, mkv, mov, webm waghera")
     ap.add_argument("--clips", type=int, default=5, help="Kitni clips chahiye: 1, 2, 3, 4, 5, 10 ya jitni chahiye")
     ap.add_argument("--fit", choices=["face","blur"], default="face")
     ap.add_argument("--language", default="auto", help="Video ki language: auto ya language code: en ur hi ar es fr de pt tr id bn pa ... (Whisper 99 languages)")
@@ -550,6 +567,8 @@ if __name__ == "__main__":
                     help="Clip ke subtitles ki language khud select karo: auto (video wali), none (without subtitles), ya en/ur/hi/ar/es/fr/de/pt/tr/id/bn/pa/ru/ja/ko/zh")
     ap.add_argument("--no-subtitles", action="store_true", help="Without subtitles clips banao (saaf clip, koi captions nahi)")
     ap.add_argument("--translate-to-english", action="store_true", help="Subtitles ko English mein translate kar do (purana option, --subtitle-language en ke barabar)")
+    ap.add_argument("--duration", type=int, default=None, choices=[15,30,45,60,90],
+                    help="Har clip ki duration seconds mein: 15, 30, 45, 60 ya 90 (na do to auto 25-60 sec)")
     ap.add_argument("--min-sec", type=int, default=25)
     ap.add_argument("--max-sec", type=int, default=60)
     ap.add_argument("--no-emoji", action="store_true")
@@ -566,7 +585,11 @@ if __name__ == "__main__":
     elif a.translate_to_english and sub_lang == "auto":
         sub_lang = "en"
     quals = tuple(q.strip() for q in a.qualities.split(",") if q.strip())
+    min_sec, max_sec = a.min_sec, a.max_sec
+    if a.duration:
+        min_sec = max(5, a.duration - 5)
+        max_sec = a.duration + 5
     process(url=a.url, file=a.file, max_clips=a.clips, fit=a.fit, use_emoji=not a.no_emoji, out_root=a.out,
             language=lang, translate=a.translate_to_english, subtitle_language=sub_lang,
-            min_sec=a.min_sec, max_sec=a.max_sec,
+            min_sec=min_sec, max_sec=max_sec,
             qualities=quals, i_own_this=a.i_own_this)

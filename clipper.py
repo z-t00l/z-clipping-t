@@ -10,8 +10,10 @@ Usage:
   .venv/bin/python clipper.py --url "https://youtube.com/watch?v=..." --clips 5
   .venv/bin/python clipper.py --url "https://youtube.com/watch?v=..." --clips 10 --language auto
   .venv/bin/python clipper.py --file video.mp4 --clips 1 --fit face --language ur
+  .venv/bin/python clipper.py --url "https://youtube.com/watch?v=..." --clips 5 --subtitle-language ur
   # --clips: 1, 2, 3, 4, 5, 10 ya jitnay chahiye (koi upper limit code mein nahi, video ki length par depend hai)
-  # --language: auto (default, Whisper khud pehchanta hai) ya en/ur/hi/ar/es/fr/de/pt/tr/id/bn/pa waghera
+  # --language: video ki language, auto (default, Whisper khud pehchanta hai) ya en/ur/hi/ar/es/fr/de/pt/tr/id/bn/pa waghera
+  # --subtitle-language: clip ke subtitles ki language khud select karo, auto (video wali) ya en/ur/hi/ar/es/fr/de/pt/tr/id/bn/pa/ru/ja/ko/zh
 """
 import argparse, json, math, os, re, subprocess, sys
 from pathlib import Path
@@ -62,6 +64,17 @@ QUALITIES = {
     "4k": (2160, 3840),     # 4K / UHD vertical
 }
 
+# Subtitles ki language user khud select kar sakta hai (video ki language se alag).
+# "auto" = video wali original language ke subtitles.
+SUBTITLE_LANGUAGES = {
+    "auto": "Auto (video wali language)",
+    "none": "Without Subtitles (koi subtitles nahi)",
+    "en": "English", "ur": "Urdu", "hi": "Hindi", "ar": "Arabic",
+    "es": "Spanish", "fr": "French", "de": "German", "pt": "Portuguese",
+    "tr": "Turkish", "id": "Indonesian", "bn": "Bengali", "pa": "Punjabi",
+    "ru": "Russian", "ja": "Japanese", "ko": "Korean", "zh": "Chinese",
+}
+
 def get_video_info(url):
     """License / copyright check. Clip karne se copyright khatam NAHI hota."""
     try:
@@ -82,16 +95,34 @@ def get_video_info(url):
     except Exception as e:
         return {"license": "unknown", "copyright_status": f"License check fail: {e}. Sirf apni / CC / permission wali video use karo."}
 
-def download(url, outdir: Path, max_height=1080):
+def download(url, outdir: Path, max_height=1080, language=None, subtitle_language=None):
     outdir.mkdir(parents=True, exist_ok=True)
     tmpl = str(outdir / "source.%(ext)s")
     fmt = f"bestvideo[height<={max_height}][ext=mp4]+bestaudio[ext=m4a]/best[height<={max_height}]"
+    # Pehle sirf video download karo. Subtitles alag step mein hain taake
+    # subtitle rate-limit (HTTP 429) poori video download ko fail na kare.
     run([sys.executable, "-m", "yt_dlp", "-f", fmt,
-         "--merge-output-format", "mp4", "--write-subs", "--write-auto-subs", "--sub-langs", "all,-live_chat",
-         "--convert-subs", "vtt", "-o", tmpl, url])
+         "--merge-output-format", "mp4", "-o", tmpl, url])
+    # Phir limited languages mein subtitles try karo. "all" languages
+    # mangne se YouTube 429 de deta hai, is liye sirf zaroori languages.
+    # User ne subtitles language select ki hai to wo sab se pehle mango.
+    langs = []
+    if subtitle_language and subtitle_language not in ("auto", "none"):
+        langs += [subtitle_language, f".*-{subtitle_language}"]
+    if language:
+        langs += [language, f"{language}-orig", "en"]
+    else:
+        langs += ["en", "ur", "hi", "hi-orig", "ar", "es", "fr", "de", "pt", "tr", "id", "bn", "pa"]
+    sub_langs = ",".join(dict.fromkeys(langs))
+    try:
+        run([sys.executable, "-m", "yt_dlp", "--skip-download",
+             "--write-subs", "--write-auto-subs", "--sub-langs", sub_langs,
+             "--convert-subs", "vtt", "--ignore-errors", "-o", tmpl, url])
+    except Exception as e:
+        print(f"Subtitles download nahi ho sakay ({e}), Whisper use hoga.")
     mp4 = list(outdir.glob("source.mp4"))
     if not mp4:
-        mp4 = list(outdir.glob("source.*"))
+        mp4 = [p for p in outdir.glob("source.*") if p.suffix not in (".vtt", ".srt")]
     return mp4[0]
 
 def parse_vtt(path: Path):
@@ -129,19 +160,118 @@ def transcribe_whisper(video: Path, outdir: Path, language=None, translate=False
     print(f"Whisper language={info.language} (p={info.language_probability:.2f}) words={len(words)}")
     return words
 
-def get_words(video: Path, outdir: Path, language=None, translate=False):
-    # Agar user ne specific language di hai aur translate nahi chahiye, to matching VTT pehle try karo.
+MYMEMORY_CODES = {
+    "en": "en-GB", "ur": "ur-PK", "hi": "hi-IN", "ar": "ar-SA", "es": "es-ES",
+    "fr": "fr-FR", "de": "de-DE", "pt": "pt-PT", "tr": "tr-TR", "id": "id-ID",
+    "bn": "bn-IN", "pa": "pa-IN", "ru": "ru-RU", "ja": "ja-JP", "ko": "ko-KR", "zh": "zh-CN",
+}
+
+def _translate_text(text, target_language, source_language=None):
+    """Ek text chunk translate karo. Pehle Google, fail ho to MyMemory."""
+    try:
+        from deep_translator import GoogleTranslator
+        result = GoogleTranslator(source="auto", target=target_language).translate(text)
+        if result:
+            return result
+    except Exception as e:
+        print(f"Google translate fail ({str(e)[:120]}), MyMemory try kar raha hun.")
+    try:
+        from deep_translator import MyMemoryTranslator
+        src = MYMEMORY_CODES.get(source_language or "en", "en-GB")
+        tgt = MYMEMORY_CODES.get(target_language, target_language)
+        result = MyMemoryTranslator(source=src, target=tgt).translate(text)
+        if result:
+            return result
+    except Exception as e:
+        print(f"MyMemory translate fail ({str(e)[:120]}), original text rakha gaya.")
+    return text
+
+def translate_words(words, target_language, source_language=None):
+    """Transcript ko user ki select ki hui subtitle language mein translate karo.
+
+    Words ko chhote chunks (lagbhag 12 words) mein translate karke har chunk
+    ki timing usi chunk ke start/end par rakhi jati hai, taake subtitles
+    audio ke saath sync rahen. Translation fail ho to original words wapas
+    de diye jate hain (clip phir bhi ban jayegi).
+    """
+    if not words or not target_language or target_language in ("auto", "none"):
+        return words
+    out = []
+    chunk_size = 12
+    for i in range(0, len(words), chunk_size):
+        chunk = words[i:i + chunk_size]
+        text = " ".join(w["word"] for w in chunk).strip()
+        if not text:
+            continue
+        translated = _translate_text(text, target_language, source_language=source_language)
+        tw = translated.split()
+        if not tw:
+            tw = [text]
+        start, end = chunk[0]["start"], chunk[-1]["end"]
+        step = max(0.01, (end - start) / len(tw))
+        for j, w in enumerate(tw):
+            out.append({"word": w, "start": start + j * step, "end": start + (j + 1) * step})
+    print(f"Subtitles translated to '{target_language}': {len(out)} words")
+    return out
+
+def _pick_vtt(vtts, language=None, subtitle_language=None):
+    """Sab se munasib caption file choose karo."""
+    if not vtts:
+        return None
+    # 1) User ki select ki hui subtitle language ki file sab se pehle.
+    if subtitle_language and subtitle_language not in ("auto", "none"):
+        match = [v for v in vtts if f".{subtitle_language}." in v.name or f"-{subtitle_language}." in v.name
+                 or f".{subtitle_language}-" in v.name]
+        if match:
+            return match[0]
+    # 2) Video ki specific language.
+    if language:
+        match = [v for v in vtts if f".{language}" in v.name or f"-{language}" in v.name]
+        if match:
+            return match[0]
+    # 3) Auto: en, phir original, phir ur/hi/ar.
+    for pref in (".en.", "-orig", ".ur.", ".hi.", ".ar."):
+        match = [v for v in vtts if pref in v.name]
+        if match:
+            return match[0]
+    return vtts[0]
+
+def _vtt_source_language(name):
+    """Caption file name se source language guess karo, masalan source.en.vtt -> en."""
+    m = re.search(r"source\.([a-z]{2,3})(?:-|_|\.)", name)
+    return m.group(1) if m else None
+
+def get_words(video: Path, outdir: Path, language=None, translate=False, subtitle_language=None):
+    # subtitle_language: user ki select ki hui subtitles language.
+    # "auto"/None = video wali language. "none" = without subtitles (transcript
+    # sirf best clips choose karne ke liye use hoga, clip par nahi lagega).
+    # "en" = English (purana --translate-to-english bhi yahi hai).
+    if translate and not subtitle_language:
+        subtitle_language = "en"
     vtts = list(outdir.glob("source*.vtt"))
-    if vtts and not translate:
-        chosen = vtts[0]
-        if language:
-            match = [v for v in vtts if f".{language}" in v.name or f"-{language}" in v.name]
-            if match: chosen = match[0]
+    # English chahiye aur en captions mojood hain to wahi best hain.
+    # Kisi aur language ki captions mojood hain to wahi use karo.
+    if vtts:
+        chosen = _pick_vtt(vtts, language=language, subtitle_language=subtitle_language)
         words = parse_vtt(chosen)
         if len(words) > 20:
             print(f"Using YouTube captions ({chosen.name}): {len(words)} words")
+            # Agar chosen file user ki subtitle language ki nahi hai, to
+            # usi transcript ko us language mein translate kar do.
+            if subtitle_language and subtitle_language not in ("auto", "none") and \
+               f".{subtitle_language}." not in chosen.name and f"-{subtitle_language}." not in chosen.name:
+                words = translate_words(words, subtitle_language,
+                                        source_language=language or _vtt_source_language(chosen.name))
             return words
-    return transcribe_whisper(video, outdir, language=language, translate=translate)
+    # Captions nahi mile: Whisper. English subtitles ke liye Whisper ka
+    # apna translate task use karo, baaki languages ke liye pehle original
+    # transcript, phir translate_words.
+    if subtitle_language == "en":
+        return transcribe_whisper(video, outdir, language=language, translate=True)
+    words = transcribe_whisper(video, outdir, language=language, translate=False)
+    if subtitle_language and subtitle_language not in ("auto", "none"):
+        words = translate_words(words, subtitle_language, source_language=language)
+    return words
 
 def score_segment(words_seg):
     text = " ".join(w["word"] for w in words_seg).lower()
@@ -285,7 +415,7 @@ def make_title_hashtags(text):
     return title, " ".join(tags)
 
 def process(url=None, file=None, max_clips=5, fit="face", use_emoji=True, out_root="output",
-            language=None, translate=False, min_sec=25, max_sec=60,
+            language=None, translate=False, subtitle_language=None, min_sec=25, max_sec=60,
             qualities=("720p","1080p"), i_own_this=False):
     if max_clips < 1:
         raise SystemExit("--clips kam az kam 1 hona chahiye")
@@ -300,8 +430,8 @@ def process(url=None, file=None, max_clips=5, fit="face", use_emoji=True, out_ro
             info["copyright_status"] = "User ne confirm kiya ke ye unki apni video hai ya unke paas permission hai. Phir bhi platform rules check karo."
         print("COPYRIGHT CHECK:", info.get("license"), "-", info.get("copyright_status"))
     max_h = 2160 if any(q in ("2k","4k") for q in qualities) else 1080
-    video = Path(file) if file else download(url, work, max_height=max_h)
-    words = get_words(video, work, language=language, translate=translate)
+    video = Path(file) if file else download(url, work, max_height=max_h, language=language, subtitle_language=subtitle_language)
+    words = get_words(video, work, language=language, translate=translate, subtitle_language=subtitle_language)
     (work/"transcript.json").write_text(json.dumps(words, ensure_ascii=False, indent=2))
     cands = find_candidates(words, max_clips=max_clips, min_sec=min_sec, max_sec=max_sec)
     print(f"Found {len(cands)} candidate clips")
@@ -316,14 +446,19 @@ def process(url=None, file=None, max_clips=5, fit="face", use_emoji=True, out_ro
         downloads = {}
         final = None
         # Har quality ke liye alag file, WITHOUT watermark (koi watermark filter nahi hai)
+        no_subs = (subtitle_language == "none")
         for q in qualities:
             qw, qh = QUALITIES[q]
-            ass = clip_dir/f"subs_{q}.ass"; make_ass(c["words"], c["start"], ass, use_emoji=use_emoji, width=qw, height=qh)
             out_file = clip_dir/f"clip_{idx:02d}_{q}.mp4"
-            hook_size = max(24, int(38 * qw / 720))
-            hook_y = int(80 * qh / 1280)
-            vf = (f"scale={qw}:{qh}:flags=lanczos,ass={ass},"
-                  f"drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='{hook_title}':fontcolor=white:fontsize={hook_size}:borderw=3:bordercolor=black:x=(w-text_w)/2:y={hook_y}:enable='lt(t,3)'")
+            if no_subs:
+                # Without subtitles: saaf clip, na captions na hook title text.
+                vf = f"scale={qw}:{qh}:flags=lanczos"
+            else:
+                ass = clip_dir/f"subs_{q}.ass"; make_ass(c["words"], c["start"], ass, use_emoji=use_emoji, width=qw, height=qh)
+                hook_size = max(24, int(38 * qw / 720))
+                hook_y = int(80 * qh / 1280)
+                vf = (f"scale={qw}:{qh}:flags=lanczos,ass={ass},"
+                      f"drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='{hook_title}':fontcolor=white:fontsize={hook_size}:borderw=3:bordercolor=black:x=(w-text_w)/2:y={hook_y}:enable='lt(t,3)'")
             run(["ffmpeg","-y","-i",str(silent),"-i",str(audio),"-vf",vf,"-af","loudnorm=I=-14:TP=-1:LRA=11",
                  "-c:v","libx264","-pix_fmt","yuv420p","-c:a","aac","-shortest",str(out_file)])
             downloads[q] = {"file": str(out_file), "width": qw, "height": qh,
@@ -337,6 +472,9 @@ def process(url=None, file=None, max_clips=5, fit="face", use_emoji=True, out_ro
         c["score"]["face_pct"] = face_pct
         results.append({"clip": idx, "file": str(final), "downloads": downloads, "thumbnail": str(thumb),
                         "watermark": False,
+                        "subtitle_language": subtitle_language or ("en" if translate else "auto"),
+                        "subtitle_language_name": SUBTITLE_LANGUAGES.get(subtitle_language or ("en" if translate else "auto"), subtitle_language),
+                        "video_language": language or "auto",
                         "start": round(c["start"],2), "end": round(c["end"],2),
                         "duration": round(c["end"]-c["start"],2), "viral_score": c["score"],
                         "title": title, "hashtags": tags, "text": c["text"][:500],
@@ -351,8 +489,11 @@ if __name__ == "__main__":
     ap.add_argument("--url"); ap.add_argument("--file")
     ap.add_argument("--clips", type=int, default=5, help="Kitni clips chahiye: 1, 2, 3, 4, 5, 10 ya jitni chahiye")
     ap.add_argument("--fit", choices=["face","blur"], default="face")
-    ap.add_argument("--language", default="auto", help="auto ya language code: en ur hi ar es fr de pt tr id bn pa ... (Whisper 99 languages)")
-    ap.add_argument("--translate-to-english", action="store_true", help="Subtitles ko English mein translate kar do")
+    ap.add_argument("--language", default="auto", help="Video ki language: auto ya language code: en ur hi ar es fr de pt tr id bn pa ... (Whisper 99 languages)")
+    ap.add_argument("--subtitle-language", default="auto", choices=list(SUBTITLE_LANGUAGES.keys()),
+                    help="Clip ke subtitles ki language khud select karo: auto (video wali), none (without subtitles), ya en/ur/hi/ar/es/fr/de/pt/tr/id/bn/pa/ru/ja/ko/zh")
+    ap.add_argument("--no-subtitles", action="store_true", help="Without subtitles clips banao (saaf clip, koi captions nahi)")
+    ap.add_argument("--translate-to-english", action="store_true", help="Subtitles ko English mein translate kar do (purana option, --subtitle-language en ke barabar)")
     ap.add_argument("--min-sec", type=int, default=25)
     ap.add_argument("--max-sec", type=int, default=60)
     ap.add_argument("--no-emoji", action="store_true")
@@ -363,7 +504,13 @@ if __name__ == "__main__":
     if not a.url and not a.file:
         ap.error("--url ya --file lazmi hai")
     lang = None if a.language.lower() == "auto" else a.language.lower()
+    sub_lang = a.subtitle_language.lower()
+    if a.no_subtitles:
+        sub_lang = "none"
+    elif a.translate_to_english and sub_lang == "auto":
+        sub_lang = "en"
     quals = tuple(q.strip() for q in a.qualities.split(",") if q.strip())
     process(url=a.url, file=a.file, max_clips=a.clips, fit=a.fit, use_emoji=not a.no_emoji, out_root=a.out,
-            language=lang, translate=a.translate_to_english, min_sec=a.min_sec, max_sec=a.max_sec,
+            language=lang, translate=a.translate_to_english, subtitle_language=sub_lang,
+            min_sec=a.min_sec, max_sec=a.max_sec,
             qualities=quals, i_own_this=a.i_own_this)

@@ -56,13 +56,14 @@ def run(cmd):
         raise SystemExit(f"command failed: {cmd[0]}")
     return r
 
-def yt_dlp_cmd(*args):
+def yt_dlp_cmd(*args, client=None):
     """yt-dlp command. Kuch environments (proxy wale) mein certificate verify
     fail hota hai; wahan CLIPPER_NO_CHECK_CERTIFICATES=1 set karne se
-    --no-check-certificates lag jata hai. Default secure hai."""
+    --no-check-certificates lag jata hai. Default secure hai.
+    YouTube bot-check se bachne ke liye player client badla ja sakta hai."""
     cmd = [sys.executable, "-m", "yt_dlp"]
-    # YouTube bot-check se bachne ke liye android player client pehle try hota hai
-    cmd += ["--extractor-args", "youtube:player_client=android,web"]
+    if client:
+        cmd += ["--extractor-args", f"youtube:player_client={client}"]
     if os.environ.get("CLIPPER_NO_CHECK_CERTIFICATES") == "1":
         cmd.append("--no-check-certificates")
     return cmd + list(args)
@@ -114,12 +115,28 @@ def download(url, outdir: Path, max_height=1080, language=None, subtitle_languag
     # subtitle rate-limit (HTTP 429) poori video download ko fail na kare.
     # Koi bhi link chalega: YouTube, TikTok, Instagram, Facebook, X, Vimeo,
     # ya direct MP4/MOV link (yt-dlp 1000+ sites support karta hai).
-    try:
-        run(yt_dlp_cmd("-f", fmt,
-             "--merge-output-format", "mp4", "-o", tmpl, url))
-    except SystemExit:
-        # direct media link / single-format sites ke liye fallback
-        run(yt_dlp_cmd("-f", "best", "--merge-output-format", "mp4", "-o", tmpl, url))
+    # YouTube bot-check ("Sign in to confirm you're not a bot") par
+    # mukhtalif player clients bari bari try karo.
+    clients = ["android", "tv_embedded", "web_embedded", "ios", "web", None]
+    last_err = None
+    for client in clients:
+        try:
+            run(yt_dlp_cmd("-f", fmt,
+                 "--merge-output-format", "mp4", "-o", tmpl, url, client=client))
+            last_err = None
+            break
+        except SystemExit as e:
+            last_err = e
+            try:
+                # direct media link / single-format sites ke liye fallback
+                run(yt_dlp_cmd("-f", "best", "--merge-output-format", "mp4", "-o", tmpl, url, client=client))
+                last_err = None
+                break
+            except SystemExit as e2:
+                last_err = e2
+                continue
+    if last_err is not None:
+        raise last_err
     # Phir limited languages mein subtitles try karo. "all" languages
     # mangne se YouTube 429 de deta hai, is liye sirf zaroori languages.
     # User ne subtitles language select ki hai to wo sab se pehle mango.

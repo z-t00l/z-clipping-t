@@ -64,6 +64,10 @@ def yt_dlp_cmd(*args, client=None):
     cmd = [sys.executable, "-m", "yt_dlp"]
     if client:
         cmd += ["--extractor-args", f"youtube:player_client={client}"]
+    # YouTube cookies (GitHub secret YT_COOKIES se bani file) bot-check ka asal hal hai
+    cookies_file = os.environ.get("YT_COOKIES_FILE") or ("cookies.txt" if os.path.exists("cookies.txt") else None)
+    if cookies_file and os.path.exists(cookies_file):
+        cmd += ["--cookies", cookies_file]
     if os.environ.get("CLIPPER_NO_CHECK_CERTIFICATES") == "1":
         cmd.append("--no-check-certificates")
     return cmd + list(args)
@@ -325,7 +329,7 @@ def score_segment(words_seg):
     if "!" in text: engagement += 10
     engagement = min(100, engagement)
     overall = round(hook*0.40 + pacing*0.35 + engagement*0.25)
-    return {"overall": overall, "hook": round(hook), "pacing": round(pacing), "engagement": round(engagement), "wpm": round(wpm)}
+    return {"overall": overall, "viral": overall, "hook": round(hook), "pacing": round(pacing), "engagement": round(engagement), "wpm": round(wpm)}
 
 def find_candidates(words, max_clips=5, min_sec=25, max_sec=60):
     if not words: return []

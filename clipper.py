@@ -477,14 +477,89 @@ def render_face_tracked(video: Path, start, end, out_silent: Path, fit="face"):
     return face_pct
 
 def make_title_hashtags(text):
+    """Best title: sab se zyada hook/emotion wali line chuno, emoji lagao."""
     clean = re.sub(r"\s+", " ", text).strip()
-    title = (clean[:60] + ("..." if len(clean)>60 else ""))
-    tags = ["#shorts","#reels","#viral","#tiktok"]
+    sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", clean) if len(s.strip()) > 12]
+    def sent_score(s):
+        low = s.lower()
+        sc = sum(3 for h in HOOK_WORDS if h in low) + sum(2 for e in EMOTION_WORDS if e in low)
+        if "?" in s: sc += 4
+        if "!" in s: sc += 2
+        if re.search(r"\d+", s): sc += 2
+        if 25 <= len(s) <= 90: sc += 2
+        return sc
+    best = max(sentences, key=sent_score) if sentences else clean[:80]
+    title = best[:90].rstrip()
+    if len(best) > 90: title += "..."
+    emoji = emoji_for(best) or emoji_for(clean)
+    if emoji: title = f"{emoji} {title}"
+    tags = ["#shorts","#reels","#viral","#tiktok","#fyp","#trending"]
     low = clean.lower()
-    if "money" in low or "business" in low: tags.append("#business")
-    if "love" in low: tags.append("#love")
+    if "money" in low or "business" in low or "paisa" in low: tags.append("#business")
+    if "love" in low or "mohabbat" in low: tags.append("#love")
     if "learn" in low or "seekho" in low: tags.append("#learning")
-    return title, " ".join(tags)
+    if "funny" in low or "hasna" in low: tags.append("#funny")
+    caption = f"{title}\n\n{' '.join(tags)}"
+    return title, " ".join(tags), caption
+
+def make_thumbnail(clip_file: Path, title: str, out_path: Path):
+    """Best attractive thumbnail: sab se sharp + bada face wala frame,
+    colors enhance karke us par bold title likha hota hai."""
+    import cv2
+    from PIL import Image, ImageDraw, ImageFont, ImageEnhance
+    cap = cv2.VideoCapture(str(clip_file))
+    fps = cap.get(cv2.CAP_PROP_FPS) or 25
+    total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
+    cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
+    best, best_score = None, -1
+    step = max(1, int(fps * 0.5))
+    for n in range(0, max(total, 1), step):
+        cap.set(cv2.CAP_PROP_POS_FRAMES, n)
+        ok, frame = cap.read()
+        if not ok: break
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        sharp = float(cv2.Laplacian(gray, cv2.CV_64F).var())
+        faces = cascade.detectMultiScale(cv2.resize(gray, (360, 640)), 1.15, 5, minSize=(30,30))
+        face_area = max((fw*fh for x, y, fw, fh in faces), default=0) / (360*640)
+        bright = float(gray.mean())
+        bright_score = 100 - abs(bright - 130)
+        score = face_area * 4000 + min(sharp, 800) / 4 + bright_score
+        if score > best_score:
+            best_score, best = score, frame.copy()
+    cap.release()
+    if best is None:
+        run(["ffmpeg","-y","-ss","1","-i",str(clip_file),"-frames:v","1",str(out_path)])
+        return
+    img = Image.fromarray(cv2.cvtColor(best, cv2.COLOR_BGR2RGB)).resize((720, 1280))
+    img = ImageEnhance.Color(img).enhance(1.3)
+    img = ImageEnhance.Contrast(img).enhance(1.12)
+    img = ImageEnhance.Sharpness(img).enhance(1.4)
+    # title text: neeche dark band par bold white text
+    draw = ImageDraw.Draw(img, "RGBA")
+    clean_title = re.sub(r"[^\w\s?!.,'’\-]", "", title).strip()
+    words = clean_title.split()
+    lines, line = [], ""
+    for wd in words:
+        if len(line) + len(wd) + 1 > 22 and line:
+            lines.append(line); line = wd
+        else:
+            line = f"{line} {wd}".strip()
+        if len(lines) >= 2: break
+    if line and len(lines) < 3: lines.append(line)
+    lines = lines[:3]
+    try:
+        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 52)
+    except Exception:
+        font = ImageFont.load_default()
+    band_h = 70 + 62 * len(lines)
+    draw.rectangle([0, 1280 - band_h, 720, 1280], fill=(0, 0, 0, 150))
+    y = 1280 - band_h + 30
+    for ln in lines:
+        bbox = draw.textbbox((0, 0), ln, font=font)
+        x = (720 - (bbox[2] - bbox[0])) / 2
+        draw.text((x, y), ln, font=font, fill=(255, 255, 255), stroke_width=3, stroke_fill=(0, 0, 0))
+        y += 62
+    img.save(out_path, "JPEG", quality=90)
 
 def process(url=None, file=None, max_clips=5, fit="face", use_emoji=True, out_root="output",
             language=None, translate=False, subtitle_language=None, min_sec=25, max_sec=60,
@@ -537,10 +612,10 @@ def process(url=None, file=None, max_clips=5, fit="face", use_emoji=True, out_ro
                             "label": {"720p":"HD 720p","1080p":"Full HD 1080p","2k":"2K","4k":"4K"}[q],
                             "watermark": False}
             if final is None: final = out_file
-        # thumbnail at 1 sec
+        # best attractive thumbnail (sharp frame + bada face + title text)
         thumb = clip_dir/"thumbnail.jpg"
-        run(["ffmpeg","-y","-ss","1","-i",str(final),"-frames:v","1",str(thumb)])
-        title, tags = make_title_hashtags(c["text"])
+        title, tags, caption = make_title_hashtags(c["text"])
+        make_thumbnail(final, title, thumb)
         c["score"]["face_pct"] = face_pct
         results.append({"clip": idx, "file": str(final), "downloads": downloads, "thumbnail": str(thumb),
                         "watermark": False,
@@ -549,10 +624,21 @@ def process(url=None, file=None, max_clips=5, fit="face", use_emoji=True, out_ro
                         "video_language": language or "auto",
                         "start": round(c["start"],2), "end": round(c["end"],2),
                         "duration": round(c["end"]-c["start"],2), "viral_score": c["score"],
-                        "title": title, "hashtags": tags, "text": c["text"][:500],
+                        "title": title, "hashtags": tags, "caption": caption, "text": c["text"][:500],
                         "source_license": info.get("license"), "copyright_status": info.get("copyright_status"),
                         "source_title": info.get("title"), "source_uploader": info.get("uploader")})
     (outdir/"clips.json").write_text(json.dumps(results, ensure_ascii=False, indent=2))
+    # Download option 3: saari clips ek ZIP file mein
+    import zipfile
+    zip_path = outdir/"all_clips.zip"
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as z:
+        for r in results:
+            for q, d in r["downloads"].items():
+                z.write(d["file"], arcname=f"clip_{r['clip']:02d}/{Path(d['file']).name}")
+            z.write(r["thumbnail"], arcname=f"clip_{r['clip']:02d}/thumbnail.jpg")
+            z.writestr(f"clip_{r['clip']:02d}/title.txt", f"{r['title']}\n\n{r['caption']}\n")
+        z.write(outdir/"clips.json", arcname="clips.json")
+    print(f"ZIP ready: {zip_path} ({zip_path.stat().st_size//1024} KB) - saari clips ek file mein")
     print(json.dumps(results, ensure_ascii=False, indent=2))
     return results
 

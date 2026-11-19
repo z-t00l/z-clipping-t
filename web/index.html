@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ZUBI TOOL — AI Video Clipping</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:'Segoe UI',system-ui,Arial,sans-serif;background:#0b0e17;color:#eef1ff;line-height:1.5}
@@ -24,14 +25,21 @@
   .check{display:flex;gap:9px;align-items:center;font-weight:600;font-size:14px;color:#dbe1ff;margin-top:14px}
   .check input{width:auto}
   button.cta{width:100%;padding:16px;border:0;border-radius:14px;background:linear-gradient(120deg,#ff3d5a,#ff7a18);color:#fff;font-size:18px;font-weight:800;cursor:pointer;margin-top:18px}
-  button.cta:active{transform:scale(.99)}
+  button.cta:disabled{opacity:.55}
   #progwrap{margin-top:16px;display:none}
   #progbar-wrap{background:#232a42;border-radius:99px;height:15px;overflow:hidden;margin-top:7px}
-  #progbar{background:linear-gradient(90deg,#7c3aed,#22c55e);height:100%;width:0%;transition:width .4s}
+  #progbar{background:linear-gradient(90deg,#7c3aed,#22c55e);height:100%;width:0%;transition:width .5s}
   .muted{color:#8b93b8;font-size:13px;margin-top:7px}
   .ok{color:#4ade80;font-weight:700}
   .warn{color:#ffb86b;font-size:12.5px;margin-top:10px}
-  .jobcard{background:#0e1220;border:1px solid #232a42;border-radius:12px;padding:12px}
+  .clipcard{background:#0e1220;border:1px solid #232a42;border-radius:14px;overflow:hidden}
+  .clipcard video{width:100%;aspect-ratio:9/16;object-fit:cover;background:#000}
+  .clipcard .meta{padding:11px}
+  .clipcard .t{font-weight:700;font-size:13.5px}
+  .clipcard .s{color:#8b93b8;font-size:12px;margin-top:3px}
+  .dlbtn{display:inline-block;background:linear-gradient(120deg,#7c3aed,#2563eb);color:#fff;border:0;padding:9px 13px;border-radius:9px;font-weight:700;font-size:13px;cursor:pointer;margin-top:9px}
+  .zipbtn{display:block;text-align:center;background:#16a34a;color:#fff;border:0;padding:13px;border-radius:12px;font-weight:800;font-size:15px;cursor:pointer;width:100%;margin-bottom:14px}
+  details summary{cursor:pointer;font-weight:700;color:#c7cdf5;font-size:14px}
   footer{text-align:center;color:#5b648a;font-size:12.5px;padding-bottom:26px}
 </style>
 </head>
@@ -48,6 +56,7 @@
     <input id="url" placeholder="https://...">
     <label for="upload">Ya Video / Movie Upload Karo</label>
     <input id="upload" type="file" accept="video/*,.mkv,.mov,.webm">
+    <p class="muted">Upload wali file ke liye file Jaan ko chat mein bhej do, wo clips bana dega. Link wali videos yahin se auto ban jati hain.</p>
   </section>
 
   <section class="card">
@@ -119,16 +128,18 @@
   </section>
 
   <section class="card">
-    <h2>Download</h2>
-    <div id="dloptions" style="display:none">
-    <label>Quality: <b style="color:#4ade80">Auto HD</b> (source jitni HD, utni best)</label>
-    <label for="dltype">Download Type</label>
-    <select id="dltype">
-      <option value="single" selected>Single Clip</option>
-      <option value="all">All Clips — 1 Click</option>
-      <option value="zip">All Clips — ZIP</option>
-    </select>
-    </div>
+    <details id="tokendetails">
+      <summary>GitHub Token (ek bar lagana hai, clips auto banane ke liye)</summary>
+      <label for="ghtoken">Token</label>
+      <input id="ghtoken" type="password" placeholder="github_pat_...">
+      <p class="muted">Token sirf tumhare phone/browser mein save hota hai, kahin bheja nahi jata. Token banane ke liye: github.com → Settings → Developer settings → Fine-grained tokens → Generate new token → Repository: z-clipping-t → Permissions: Actions (Read and write).</p>
+      <button class="dlbtn" id="savetoken" type="button">Token Save Karo</button>
+      <span class="muted" id="tokenstate"></span>
+    </details>
+  </section>
+
+  <section class="card">
+    <h2>Clips Banao</h2>
     <button class="cta" id="go">Clips Banao</button>
     <div id="progwrap">
       <div style="display:flex;justify-content:space-between;font-size:13.5px;font-weight:650"><span id="progstage">Processing...</span><span id="progpct">0%</span></div>
@@ -138,35 +149,150 @@
     <p id="out" class="muted"></p>
   </section>
 
-  <section class="card">
+  <section class="card" id="gallerycard" style="display:none">
     <h2>Clips Gallery</h2>
+    <button class="zipbtn" id="zipall" type="button">All Clips ZIP Download (1 Click)</button>
     <div id="gallery" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px"></div>
   </section>
 </div>
 <footer>ZUBI TOOL</footer>
 
 <script>
+  const REPO='z-t00l/z-clipping-t';
   const chips=[...document.querySelectorAll('.chip')], clips=document.getElementById('clips');
   chips.forEach(c=>c.onclick=()=>{chips.forEach(x=>x.classList.remove('active'));c.classList.add('active');clips.value=c.dataset.n;});
   clips.oninput=()=>{chips.forEach(x=>x.classList.toggle('active',x.dataset.n===clips.value));};
   const url=document.getElementById('url'), lang=document.getElementById('lang'), fit=document.getElementById('fit'), sublang=document.getElementById('sublang'), duration=document.getElementById('duration'), upload=document.getElementById('upload');
-  function renderGallery(){
-    const jobs=JSON.parse(localStorage.getItem('clipJobs')||'[]');
-    const g=document.getElementById('gallery'); if(!g) return;
-    g.innerHTML=jobs.length? jobs.map((j,i)=>`<div class="jobcard"><div style="font-weight:700">Job ${jobs.length-i}: ${j.clips} clips</div><div style="color:#8b93b8;font-size:12px;word-break:break-all">${(j.file||j.url||'').slice(0,50)}</div><div style="color:#7dd3fc;font-size:12px">${j.duration||'auto'}s | ${j.subtitle_language} | ${j.download_type||'single'}</div><div style="color:#8b93b8;font-size:11px">${new Date(j.at).toLocaleString()}</div></div>`).join('') : '<p class="muted">Abhi koi job nahi.</p>';
-  }
-  document.getElementById('go').onclick=()=>{
-    if(!url.value.trim() && !upload.files.length){document.getElementById('out').textContent='Pehle video link dalo ya file upload karo.';return;}
-    const job={url:url.value,file:upload.files.length?upload.files[0].name:null,clips:+clips.value||5,duration:duration.value,download_type:document.getElementById('dltype').value,language:lang.value,subtitle_language:sublang.value,subtitles:sublang.value!=='none',fit:fit.value,qualities:['auto'],own:document.getElementById('own').checked,emoji:document.getElementById('emoji').checked,watermark:false,at:new Date().toISOString()};
-    const jobs=JSON.parse(localStorage.getItem('clipJobs')||'[]'); jobs.unshift(job); localStorage.setItem('clipJobs',JSON.stringify(jobs));
-    const pw=document.getElementById('progwrap'), pb=document.getElementById('progbar'), pp=document.getElementById('progpct'), ps=document.getElementById('progstage'), pl=document.getElementById('progleft');
-    pw.style.display='block';
-    const stages=[[15,'Link check...'],[35,'Settings save...'],[60,'Job tayyar...'],[85,'Gallery update...'],[100,'Ready!']];
-    let si=0;
-    const timer=setInterval(()=>{ if(si>=stages.length){clearInterval(timer); document.getElementById('dloptions').style.display='block'; renderGallery(); return;} const [pct,txt]=stages[si++]; pb.style.width=pct+'%'; pp.textContent=pct+'%'; ps.textContent=txt; pl.textContent=(100-pct)+'% baqi hai'; },450);
-    document.getElementById('out').innerHTML=`<span class="ok">Job ready:</span> ${job.clips} clips, Auto HD quality. GitHub Actions → Make Clips (Free) mein Run karo, ya Jaan ko bhej do.`;
+  const out=document.getElementById('out');
+  const tokenInput=document.getElementById('ghtoken');
+  tokenInput.value=localStorage.getItem('ghToken')||'';
+  document.getElementById('tokenstate').textContent=tokenInput.value?'Token saved hai':'Token nahi laga';
+  document.getElementById('savetoken').onclick=()=>{
+    localStorage.setItem('ghToken', tokenInput.value.trim());
+    document.getElementById('tokenstate').textContent=tokenInput.value.trim()?'Token saved hai':'Token nahi laga';
   };
-  renderGallery();
+  function setProgress(pct, stage){
+    document.getElementById('progwrap').style.display='block';
+    document.getElementById('progbar').style.width=pct+'%';
+    document.getElementById('progpct').textContent=pct+'%';
+    document.getElementById('progstage').textContent=stage;
+    document.getElementById('progleft').textContent=(100-pct)+'% baqi hai';
+  }
+  function ghHeaders(){
+    return {'Authorization':'Bearer '+localStorage.getItem('ghToken'), 'Accept':'application/vnd.github+json', 'X-GitHub-Api-Version':'2022-11-28'};
+  }
+  function saveBlob(blob, name){
+    if(window.Android && Android.saveFileBase64){
+      const reader=new FileReader();
+      reader.onload=()=>{ Android.saveFileBase64(name, reader.result.split(',')[1]); };
+      reader.readAsDataURL(blob);
+    } else {
+      const a=document.createElement('a');
+      a.href=URL.createObjectURL(blob); a.download=name; a.click();
+      setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
+    }
+  }
+  let zipBlobGlobal=null;
+  document.getElementById('zipall').onclick=()=>{ if(zipBlobGlobal) saveBlob(zipBlobGlobal, 'all_clips.zip'); };
+  async function showGallery(zipBlob){
+    zipBlobGlobal=zipBlob;
+    const zip=await JSZip.loadAsync(zipBlob);
+    let meta=[];
+    const cj=Object.keys(zip.files).find(n=>n.endsWith('clips.json'));
+    if(cj){ try{ meta=JSON.parse(await zip.files[cj].async('string')); }catch(e){} }
+    const byClip={};
+    for(const name of Object.keys(zip.files)){
+      const m=name.match(/clip_(\d+)\/(clip_\d+_\w+\.mp4|thumbnail\.jpg)$/);
+      if(m){ const idx=+m[1]; byClip[idx]=byClip[idx]||{}; if(m[2].endsWith('.mp4')) byClip[idx].video=name; else byClip[idx].thumb=name; }
+    }
+    const g=document.getElementById('gallery'); g.innerHTML='';
+    document.getElementById('gallerycard').style.display='block';
+    for(const idx of Object.keys(byClip).sort((a,b)=>a-b)){
+      const info=meta.find(x=>x.clip===+idx)||{};
+      const vBlob=await zip.files[byClip[idx].video].async('blob');
+      const vUrl=URL.createObjectURL(vBlob);
+      let tUrl='';
+      if(byClip[idx].thumb){ tUrl=URL.createObjectURL(await zip.files[byClip[idx].thumb].async('blob')); }
+      const card=document.createElement('div'); card.className='clipcard';
+      card.innerHTML=`<video controls preload="none" ${tUrl?`poster="${tUrl}"`:''} src="${vUrl}"></video>
+        <div class="meta"><div class="t">${(info.title||('Clip '+idx)).replace(/</g,'&lt;')}</div>
+        <div class="s">Viral: ${info.viral_score?info.viral_score.viral:'-'} | ${info.duration||''} sec</div>
+        <div class="s">${(info.hashtags||'').replace(/</g,'&lt;')}</div></div>`;
+      const btn=document.createElement('button'); btn.className='dlbtn'; btn.textContent='Download';
+      const fname=byClip[idx].video.split('/').pop();
+      btn.onclick=()=>saveBlob(vBlob, fname);
+      card.querySelector('.meta').appendChild(btn);
+      g.appendChild(card);
+    }
+    setProgress(100,'Complete! Clips gallery mein ready hain');
+    out.innerHTML='<span class="ok">Clips ready hain!</span> Download dabao, clip phone ki gallery/Downloads mein save ho jayegi.';
+  }
+  async function pollRun(since){
+    for(let i=0;i<180;i++){
+      await new Promise(r=>setTimeout(r,8000));
+      let runs;
+      try{
+        const r=await fetch(`https://api.github.com/repos/${REPO}/actions/workflows/clip.yml/runs?per_page=5`,{headers:ghHeaders()});
+        if(!r.ok) continue;
+        runs=(await r.json()).workflow_runs||[];
+      }catch(e){ continue; }
+      const run=runs.find(x=>new Date(x.created_at).getTime()>=since-120000);
+      if(!run){ setProgress(5,'Job start ho rahi hai...'); continue; }
+      if(run.status==='completed'){
+        if(run.conclusion!=='success'){ setProgress(100,'Fail ho gaya'); out.textContent='Clips nahi ban sakin. Video link check karo ya Jaan ko bhej do.'; document.getElementById('go').disabled=false; return; }
+        setProgress(92,'Clips download ho rahi hain...');
+        const ar=await fetch(`https://api.github.com/repos/${REPO}/actions/runs/${run.id}/artifacts`,{headers:ghHeaders()});
+        const arts=(await ar.json()).artifacts||[];
+        if(!arts.length){ out.textContent='Clips ready hain lekin download nahi mila.'; return; }
+        const dl=await fetch(arts[0].archive_download_url,{headers:ghHeaders()});
+        const blob=await dl.blob();
+        await showGallery(blob);
+        document.getElementById('go').disabled=false;
+        return;
+      }
+      // live % steps se
+      try{
+        const jr=await fetch(`https://api.github.com/repos/${REPO}/actions/runs/${run.id}/jobs`,{headers:ghHeaders()});
+        const jobs=(await jr.json()).jobs||[];
+        const steps=jobs.flatMap(j=>j.steps||[]);
+        const done=steps.filter(s=>s.status==='completed').length;
+        const pct=steps.length? Math.min(90, 8+Math.round(80*done/steps.length)) : 10;
+        const cur=steps.find(s=>s.status==='in_progress');
+        setProgress(pct, cur? cur.name : 'Processing...');
+      }catch(e){ setProgress(20,'Processing...'); }
+    }
+    out.textContent='Boht dair ho gayi. GitHub Actions mein check karo.';
+    document.getElementById('go').disabled=false;
+  }
+  document.getElementById('go').onclick=async()=>{
+    if(!url.value.trim() && !upload.files.length){out.textContent='Pehle video link dalo ya file upload karo.';return;}
+    if(upload.files.length && !url.value.trim()){out.textContent='Upload wali file ke liye file Jaan ko chat mein bhej do, wo clips bana dega.';return;}
+    const token=(localStorage.getItem('ghToken')||'').trim();
+    if(!token){
+      document.getElementById('tokendetails').open=true;
+      out.textContent='Pehle upar GitHub Token lagao (ek bar). Token ke baghair clips auto nahi banti.';
+      return;
+    }
+    document.getElementById('go').disabled=true;
+    setProgress(3,'Job bhej raha hai...');
+    const since=Date.now();
+    try{
+      const r=await fetch(`https://api.github.com/repos/${REPO}/actions/workflows/clip.yml/dispatches`,{
+        method:'POST', headers:{...ghHeaders(),'Content-Type':'application/json'},
+        body:JSON.stringify({ref:'main', inputs:{
+          url:url.value.trim(), clips:String(clips.value||5), language:lang.value,
+          subtitle_language:sublang.value, duration:duration.value, fit:fit.value,
+          translate_to_english:'false', qualities:'auto', i_own_this:String(document.getElementById('own').checked)
+        }})
+      });
+      if(r.status!==204){ out.textContent='Job start nahi hui (code '+r.status+'). Token check karo.'; document.getElementById('go').disabled=false; return; }
+      out.textContent='Job start ho gayi! Clips ban rahi hain, % live chalegi.';
+      pollRun(since);
+    }catch(e){
+      out.textContent='Internet error. Dobara try karo.';
+      document.getElementById('go').disabled=false;
+    }
+  };
 </script>
 </body>
 </html>

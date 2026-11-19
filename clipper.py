@@ -626,6 +626,69 @@ def make_thumbnail(clip_file: Path, title: str, out_path: Path, style: int = 0, 
         draw.text((bx+18, by+8), badge, font=bfont, fill=(255, 255, 255))
     img.save(out_path, "JPEG", quality=92)
 
+def report_progress(outdir, pct, stage, clip=None, total_clips=None):
+    """Live processing %: terminal par line + progress.json file (UI parhne ke liye)."""
+    pct = max(0, min(100, int(pct)))
+    bar = "#" * (pct // 5) + "-" * (20 - pct // 5)
+    extra = f" (clip {clip}/{total_clips})" if clip and total_clips else ""
+    print(f"PROGRESS [{bar}] {pct}% done, {100-pct}% baqi - {stage}{extra}", flush=True)
+    try:
+        (Path(outdir)/"progress.json").write_text(json.dumps(
+            {"percent": pct, "remaining": 100 - pct, "stage": stage,
+             "clip": clip, "total_clips": total_clips}, ensure_ascii=False))
+    except Exception:
+        pass
+
+def make_gallery(outdir, results):
+    """Clips download gallery: gallery.html jismein har clip play + download ho sakti hai."""
+    outdir = Path(outdir)
+    cards = []
+    for r in results:
+        dl_btns = "".join(
+            f'<a class="dl" href="{Path(d["file"]).relative_to(outdir) if str(d["file"]).startswith(str(outdir)) else d["file"]}" download>{d.get("label", q)}</a>'
+            for q, d in r.get("downloads", {}).items())
+        thumb = r.get("thumbnail", "")
+        try:
+            thumb_rel = str(Path(thumb).relative_to(outdir))
+        except Exception:
+            thumb_rel = thumb
+        main_file = r.get("file", "")
+        try:
+            main_rel = str(Path(main_file).relative_to(outdir))
+        except Exception:
+            main_rel = main_file
+        viral = r.get("viral_score", {}).get("viral", "-")
+        cards.append(f"""
+    <div class="card">
+      <video controls preload="none" poster="{thumb_rel}" src="{main_rel}"></video>
+      <div class="meta">
+        <div class="title">{r.get('title','Clip')}</div>
+        <div class="sub">Clip {r.get('clip','')} | Viral Score: {viral} | {r.get('duration','')} sec</div>
+        <div class="tags">{r.get('hashtags','')}</div>
+        <div class="btns">{dl_btns}<a class="dl thumb" href="{thumb_rel}" download>Thumbnail</a></div>
+      </div>
+    </div>""")
+    html = f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ZUBI TOOL - Clips Gallery</title>
+<style>
+body{{font-family:system-ui,Arial;background:#0f1220;color:#fff;margin:0;padding:16px}}
+h1{{font-size:22px}} .grid{{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px}}
+.card{{background:#1b1f33;border-radius:14px;overflow:hidden}}
+video{{width:100%;aspect-ratio:9/16;object-fit:cover;background:#000}}
+.meta{{padding:12px}} .title{{font-weight:700;margin-bottom:4px}} .sub{{color:#aab;font-size:13px}}
+.tags{{color:#7dd3fc;font-size:12px;margin:6px 0;word-break:break-word}}
+.btns{{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}}
+.dl{{background:#7c3aed;color:#fff;text-decoration:none;padding:7px 10px;border-radius:8px;font-size:13px}}
+.dl.thumb{{background:#334155}} .top{{margin:12px 0}} .top a{{background:#16a34a;color:#fff;padding:10px 14px;border-radius:10px;text-decoration:none;font-weight:700}}
+</style></head><body>
+<h1>ZUBI TOOL - Clips Gallery ({len(results)} clips)</h1>
+<div class="top"><a href="all_clips.zip" download>All Clips ZIP Download (1 Click)</a></div>
+<div class="grid">{''.join(cards)}</div>
+</body></html>"""
+    (outdir/"gallery.html").write_text(html, encoding="utf-8")
+    print(f"Gallery ready: {outdir/'gallery.html'}")
+
 def process(url=None, file=None, max_clips=5, fit="face", use_emoji=True, out_root="output",
             language=None, translate=False, subtitle_language=None, min_sec=25, max_sec=60,
             qualities=("720p","1080p"), i_own_this=False):
@@ -642,14 +705,20 @@ def process(url=None, file=None, max_clips=5, fit="face", use_emoji=True, out_ro
             info["copyright_status"] = "User ne confirm kiya ke ye unki apni video hai ya unke paas permission hai. Phir bhi platform rules check karo."
         print("COPYRIGHT CHECK:", info.get("license"), "-", info.get("copyright_status"))
     max_h = 2160 if any(q in ("2k","4k") for q in qualities) else 1080
+    report_progress(outdir, 2, "Shuru ho raha hai")
     video = Path(file) if file else download(url, work, max_height=max_h, language=language, subtitle_language=subtitle_language)
+    report_progress(outdir, 15, "Video download ho gayi, ab transcript ban raha hai")
     words = get_words(video, work, language=language, translate=translate, subtitle_language=subtitle_language)
+    report_progress(outdir, 35, "Transcript ready, best clips dhoondhe ja rahe hain")
     (work/"transcript.json").write_text(json.dumps(words, ensure_ascii=False, indent=2))
     cands = find_candidates(words, max_clips=max_clips, min_sec=min_sec, max_sec=max_sec)
     print(f"Found {len(cands)} candidate clips")
+    report_progress(outdir, 40, f"{len(cands)} best clips mil gaye, rendering shuru", 0, len(cands))
     results = []
     for idx, c in enumerate(cands, 1):
         clip_dir = outdir / f"clip_{idx:02d}"; clip_dir.mkdir(exist_ok=True)
+        base_pct = 40 + int(55 * (idx - 1) / max(1, len(cands)))
+        report_progress(outdir, base_pct, "Clip render ho rahi hai (face tracking)", idx, len(cands))
         silent = clip_dir/"silent.mp4"
         face_pct = render_face_tracked(video, c["start"], c["end"], silent, fit=fit)
         audio = clip_dir/"audio.m4a"
@@ -692,6 +761,7 @@ def process(url=None, file=None, max_clips=5, fit="face", use_emoji=True, out_ro
                         "title": title, "hashtags": tags, "caption": caption, "text": c["text"][:500],
                         "source_license": info.get("license"), "copyright_status": info.get("copyright_status"),
                         "source_title": info.get("title"), "source_uploader": info.get("uploader")})
+    report_progress(outdir, 96, "ZIP aur gallery ban rahi hai")
     (outdir/"clips.json").write_text(json.dumps(results, ensure_ascii=False, indent=2))
     # Download option 3: saari clips ek ZIP file mein
     import zipfile
@@ -704,6 +774,8 @@ def process(url=None, file=None, max_clips=5, fit="face", use_emoji=True, out_ro
             z.writestr(f"clip_{r['clip']:02d}/title.txt", f"{r['title']}\n\n{r['caption']}\n")
         z.write(outdir/"clips.json", arcname="clips.json")
     print(f"ZIP ready: {zip_path} ({zip_path.stat().st_size//1024} KB) - saari clips ek file mein")
+    make_gallery(outdir, results)
+    report_progress(outdir, 100, "Complete! Saari clips gallery mein ready hain")
     print(json.dumps(results, ensure_ascii=False, indent=2))
     return results
 

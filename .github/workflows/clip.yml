@@ -1,0 +1,66 @@
+name: Make Clips (Free)
+
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: "YouTube / stream video link"
+        required: true
+        type: string
+      clips:
+        description: "Kitni clips chahiye? 1, 2, 3, 4, 5, 10 ya jitni chahiye"
+        required: true
+        default: "5"
+        type: string
+      language:
+        description: "Language: auto ya en/ur/hi/ar/es/fr/de/pt/tr/id/bn/pa"
+        required: true
+        default: "auto"
+        type: string
+      fit:
+        description: "face (face tracking) ya blur"
+        required: true
+        default: "face"
+        type: choice
+        options: ["face", "blur"]
+      translate_to_english:
+        description: "Subtitles English mein translate karna hai?"
+        required: false
+        default: false
+        type: boolean
+      qualities:
+        description: "Download qualities, comma se: 720p,1080p,2k,4k (without watermark)"
+        required: true
+        default: "720p,1080p"
+        type: string
+      i_own_this:
+        description: "Ye meri apni video hai ya mere paas permission hai?"
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  clip:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg fonts-noto fonts-noto-color-emoji fonts-dejavu
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install python packages (free, open source)
+        run: pip install -r requirements.txt
+      - name: Make clips
+        run: |
+          EXTRA=""
+          if [ "${{ inputs.translate_to_english }}" = "true" ]; then EXTRA="$EXTRA --translate-to-english"; fi
+          if [ "${{ inputs.i_own_this }}" = "true" ]; then EXTRA="$EXTRA --i-own-this"; fi
+          python clipper.py --url "${{ inputs.url }}" --clips "${{ inputs.clips }}" --language "${{ inputs.language }}" --fit "${{ inputs.fit }}" --qualities "${{ inputs.qualities }}" $EXTRA --out output
+      - name: Upload clips (free artifact, 90 din tak)
+        uses: actions/upload-artifact@v4
+        with:
+          name: clips-${{ github.run_number }}
+          path: output/
+          retention-days: 90

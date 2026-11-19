@@ -56,6 +56,15 @@ def run(cmd):
         raise SystemExit(f"command failed: {cmd[0]}")
     return r
 
+def yt_dlp_cmd(*args):
+    """yt-dlp command. Kuch environments (proxy wale) mein certificate verify
+    fail hota hai; wahan CLIPPER_NO_CHECK_CERTIFICATES=1 set karne se
+    --no-check-certificates lag jata hai. Default secure hai."""
+    cmd = [sys.executable, "-m", "yt_dlp"]
+    if os.environ.get("CLIPPER_NO_CHECK_CERTIFICATES") == "1":
+        cmd.append("--no-check-certificates")
+    return cmd + list(args)
+
 # Vertical export qualities. Source se zyada quality real detail nahi deti, sirf upscale hoti hai.
 QUALITIES = {
     "720p": (720, 1280),    # HD
@@ -78,7 +87,7 @@ SUBTITLE_LANGUAGES = {
 def get_video_info(url):
     """License / copyright check. Clip karne se copyright khatam NAHI hota."""
     try:
-        r = subprocess.run([sys.executable, "-m", "yt_dlp", "--dump-single-json", "--no-download", url],
+        r = subprocess.run(yt_dlp_cmd("--dump-single-json", "--no-download", url),
                            capture_output=True, text=True, timeout=120)
         if r.returncode != 0:
             return {"license": "unknown", "copyright_status": "License check nahi ho saka. Sirf apni / CC / permission wali video use karo."}
@@ -101,8 +110,8 @@ def download(url, outdir: Path, max_height=1080, language=None, subtitle_languag
     fmt = f"bestvideo[height<={max_height}][ext=mp4]+bestaudio[ext=m4a]/best[height<={max_height}]"
     # Pehle sirf video download karo. Subtitles alag step mein hain taake
     # subtitle rate-limit (HTTP 429) poori video download ko fail na kare.
-    run([sys.executable, "-m", "yt_dlp", "-f", fmt,
-         "--merge-output-format", "mp4", "-o", tmpl, url])
+    run(yt_dlp_cmd("-f", fmt,
+         "--merge-output-format", "mp4", "-o", tmpl, url))
     # Phir limited languages mein subtitles try karo. "all" languages
     # mangne se YouTube 429 de deta hai, is liye sirf zaroori languages.
     # User ne subtitles language select ki hai to wo sab se pehle mango.
@@ -115,9 +124,9 @@ def download(url, outdir: Path, max_height=1080, language=None, subtitle_languag
         langs += ["en", "ur", "hi", "hi-orig", "ar", "es", "fr", "de", "pt", "tr", "id", "bn", "pa"]
     sub_langs = ",".join(dict.fromkeys(langs))
     try:
-        run([sys.executable, "-m", "yt_dlp", "--skip-download",
+        run(yt_dlp_cmd("--skip-download",
              "--write-subs", "--write-auto-subs", "--sub-langs", sub_langs,
-             "--convert-subs", "vtt", "--ignore-errors", "-o", tmpl, url])
+             "--convert-subs", "vtt", "--ignore-errors", "-o", tmpl, url))
     except Exception as e:
         print(f"Subtitles download nahi ho sakay ({e}), Whisper use hoga.")
     mp4 = list(outdir.glob("source.mp4"))

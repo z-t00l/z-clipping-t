@@ -139,14 +139,8 @@
 
   <section class="card">
     <div class="step"><div class="n">3</div><h2>Download Options</h2></div>
-    <label>Download Quality (har clip ki alag file, without watermark)</label>
-    <div class="chips" id="qualities">
-      <label class="chip"><input type="checkbox" class="q" value="720p" checked style="width:auto"> HD 720p</label>
-      <label class="chip"><input type="checkbox" class="q" value="1080p" checked style="width:auto"> Full HD 1080p</label>
-      <label class="chip"><input type="checkbox" class="q" value="2k" style="width:auto"> 2K</label>
-      <label class="chip"><input type="checkbox" class="q" value="4k" style="width:auto"> 4K</label>
-    </div>
-    <p class="muted">Note: Source video 720p hai to 4K file ban jayegi lekin real detail nahi barhegi, sirf upscale hogi. Best quality ke liye source bhi HD/4K ho.</p>
+    <label>Download Quality: Auto HD</label>
+    <p class="muted" style="background:#eef6ff;border:1px solid #c7defc;border-radius:10px;padding:11px 13px">Quality khud select hoti hai: source video jitni HD hogi, clips utni hi best quality mein banengi (720p source = HD, 1080p = Full HD, 4K = 4K). Alag se choose karne ki zaroorat nahi, hamesha sab se best quality milegi, without watermark.</p>
     <label for="dltype">Download Ka Type (clips ready honay par)</label>
     <select id="dltype">
       <option value="single" selected>Single Clip Download (har clip alag, har quality)</option>
@@ -188,9 +182,9 @@
   chips.forEach(c=>c.onclick=()=>{chips.forEach(x=>x.classList.remove('active'));c.classList.add('active');clips.value=c.dataset.n;update();});
   clips.oninput=()=>{chips.forEach(x=>x.classList.toggle('active',x.dataset.n===clips.value));update();};
   const url=document.getElementById('url'), lang=document.getElementById('lang'), fit=document.getElementById('fit'), sublang=document.getElementById('sublang'), duration=document.getElementById('duration'), upload=document.getElementById('upload');
-  [url,lang,fit,sublang,duration].forEach(e=>e.oninput=update); document.querySelectorAll('.q').forEach(e=>e.onchange=update); upload.onchange=update;
+  [url,lang,fit,sublang,duration].forEach(e=>e.oninput=update); upload.onchange=update;
   function update(){
-    const qs=[...document.querySelectorAll('.q:checked')].map(x=>x.value).join(',')||'720p';
+    const qs='auto';
     const dur=duration.value==='auto'?'':` --duration ${duration.value}`;
     const src=upload.files.length?`--file "${upload.files[0].name}"`:`--url "${url.value||'...'}"`;
     document.getElementById('cmd').textContent=`python clipper.py ${src} --clips ${clips.value||5} --language ${lang.value} --subtitle-language ${sublang.value} --fit ${fit.value}${dur} --qualities ${qs}`;
@@ -202,14 +196,14 @@
   }
   document.getElementById('go').onclick=()=>{
     if(!url.value.trim() && !upload.files.length){document.getElementById('out').textContent='Pehle video link dalo ya video/movie file upload karo.';return;}
-    const job={url:url.value,file:upload.files.length?upload.files[0].name:null,clips:+clips.value||5,duration:duration.value,download_type:document.getElementById('dltype').value,language:lang.value,subtitle_language:sublang.value,subtitles:sublang.value!=='none',fit:fit.value,qualities:[...document.querySelectorAll('.q:checked')].map(x=>x.value),own:document.getElementById('own').checked,emoji:document.getElementById('emoji').checked,watermark:false,at:new Date().toISOString()};
+    const job={url:url.value,file:upload.files.length?upload.files[0].name:null,clips:+clips.value||5,duration:duration.value,download_type:document.getElementById('dltype').value,language:lang.value,subtitle_language:sublang.value,subtitles:sublang.value!=='none',fit:fit.value,qualities:['auto'],own:document.getElementById('own').checked,emoji:document.getElementById('emoji').checked,watermark:false,at:new Date().toISOString()};
     const jobs=JSON.parse(localStorage.getItem('clipJobs')||'[]'); jobs.unshift(job); localStorage.setItem('clipJobs',JSON.stringify(jobs));
     const pw=document.getElementById('progwrap'), pb=document.getElementById('progbar'), pp=document.getElementById('progpct'), ps=document.getElementById('progstage'), pl=document.getElementById('progleft');
     pw.style.display='block';
     const stages=[[15,'Link check ho raha hai'],[35,'Settings save ho rahi hain'],[60,'Command tayyar ho rahi hai'],[85,'Gallery mein job add ho rahi hai'],[100,'Job ready! GitHub Actions par PROGRESS % live chalegi']];
     let si=0;
     const timer=setInterval(()=>{ if(si>=stages.length){clearInterval(timer); renderGallery(); return;} const [pct,txt]=stages[si++]; pb.style.width=pct+'%'; pp.textContent=pct+'%'; ps.textContent=txt; pl.textContent=(100-pct)+'% baqi hai'; },450);
-    document.getElementById('out').innerHTML=`<span class="ok">Job save ho gayi:</span> ${job.clips} clips, language=${job.language}, subtitles=${job.subtitle_language}, style=${job.fit}, qualities=${job.qualities.join(', ')} (without watermark). Ab GitHub repo mein Actions → Make Clips (Free) mein yehi details dal kar Run karo, ya ye job Muse mein Jaan ko bhej do, wo clips bana dega.`;
+    document.getElementById('out').innerHTML=`<span class="ok">Job save ho gayi:</span> ${job.clips} clips, language=${job.language}, subtitles=${job.subtitle_language}, style=${job.fit}, qualities=Auto HD (source jitni HD, utni best) (without watermark). Ab GitHub repo mein Actions → Make Clips (Free) mein yehi details dal kar Run karo, ya ye job Muse mein Jaan ko bhej do, wo clips bana dega.`;
     update();
   };
   renderGallery();

@@ -64,6 +64,11 @@ jobs:
           python-version: "3.12"
       - name: Install python packages (free, open source)
         run: pip install -r requirements.txt
+      - name: YouTube cookies (optional secret)
+        env:
+          YT_COOKIES: ${{ secrets.YT_COOKIES }}
+        run: |
+          if [ -n "$YT_COOKIES" ]; then printf '%s' "$YT_COOKIES" > cookies.txt; echo "cookies lag gayi"; else echo "cookies nahi hain"; fi
       - name: Make clips
         run: |
           EXTRA=""

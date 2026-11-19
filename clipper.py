@@ -61,6 +61,8 @@ def yt_dlp_cmd(*args):
     fail hota hai; wahan CLIPPER_NO_CHECK_CERTIFICATES=1 set karne se
     --no-check-certificates lag jata hai. Default secure hai."""
     cmd = [sys.executable, "-m", "yt_dlp"]
+    # YouTube bot-check se bachne ke liye android player client pehle try hota hai
+    cmd += ["--extractor-args", "youtube:player_client=android,web"]
     if os.environ.get("CLIPPER_NO_CHECK_CERTIFICATES") == "1":
         cmd.append("--no-check-certificates")
     return cmd + list(args)

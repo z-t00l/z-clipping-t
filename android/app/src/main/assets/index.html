@@ -120,6 +120,7 @@
 
   <section class="card">
     <h2>Download</h2>
+    <div id="dloptions" style="display:none">
     <label>Quality: <b style="color:#4ade80">Auto HD</b> (source jitni HD, utni best)</label>
     <label for="dltype">Download Type</label>
     <select id="dltype">
@@ -127,6 +128,7 @@
       <option value="all">All Clips — 1 Click</option>
       <option value="zip">All Clips — ZIP</option>
     </select>
+    </div>
     <button class="cta" id="go">Clips Banao</button>
     <div id="progwrap">
       <div style="display:flex;justify-content:space-between;font-size:13.5px;font-weight:650"><span id="progstage">Processing...</span><span id="progpct">0%</span></div>
@@ -161,7 +163,7 @@
     pw.style.display='block';
     const stages=[[15,'Link check...'],[35,'Settings save...'],[60,'Job tayyar...'],[85,'Gallery update...'],[100,'Ready!']];
     let si=0;
-    const timer=setInterval(()=>{ if(si>=stages.length){clearInterval(timer); renderGallery(); return;} const [pct,txt]=stages[si++]; pb.style.width=pct+'%'; pp.textContent=pct+'%'; ps.textContent=txt; pl.textContent=(100-pct)+'% baqi hai'; },450);
+    const timer=setInterval(()=>{ if(si>=stages.length){clearInterval(timer); document.getElementById('dloptions').style.display='block'; renderGallery(); return;} const [pct,txt]=stages[si++]; pb.style.width=pct+'%'; pp.textContent=pct+'%'; ps.textContent=txt; pl.textContent=(100-pct)+'% baqi hai'; },450);
     document.getElementById('out').innerHTML=`<span class="ok">Job ready:</span> ${job.clips} clips, Auto HD quality. GitHub Actions → Make Clips (Free) mein Run karo, ya Jaan ko bhej do.`;
   };
   renderGallery();
